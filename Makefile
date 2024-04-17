@@ -17,8 +17,9 @@ L_NAME=$(LANGUAGE)_scanner
 Y_NAME=$(LANGUAGE)_parser
 
 LFLAGS   = 
-YFLAGS   = -dtv
-CXXFLAGS = -std=c++20 -DYYDEBUG=1 -pedantic -Wall -Wextra -ggdb -I. -I$(CDK_INC_DIR) -Wno-unused-parameter
+YFLAGS   = -dtv --debug
+CXXFLAGS = -std=c++20 -pedantic -Wall -Wextra -ggdb -I. -I$(CDK_INC_DIR) -Wno-unused-parameter -msse2 -mfpmath=sse
+#CXXFLAGS = -std=c++20 -DYYDEBUG=1 -pedantic -Wall -Wextra -ggdb -I. -I$(CDK_INC_DIR) -Wno-unused-parameter
 LDFLAGS  = -L$(CDK_LIB_DIR) -lcdk #-lLLVM
 COMPILER = $(LANGUAGE)
 
@@ -60,9 +61,11 @@ $(Y_NAME).tab.h: $(Y_NAME).y
 $(L_NAME).o: $(L_NAME).cpp $(Y_NAME).tab.h
 
 .auto/all_nodes.h: 
+	mkdir -p .auto
 	$(CDK) ast --decls ast --language $(LANGUAGE) > $@
 
 .auto/visitor_decls.h: 
+	mkdir -p .auto
 	$(CDK) ast --decls target --language $(LANGUAGE) > $@
 
 $(COMPILER): $(L_NAME).o $(Y_NAME).tab.o $(OFILES)
@@ -70,6 +73,7 @@ $(COMPILER): $(L_NAME).o $(Y_NAME).tab.o $(OFILES)
 
 clean:
 	$(RM) .auto/all_nodes.h .auto/visitor_decls.h *.tab.[ch] *.o $(OFILES) $(L_NAME).cpp $(Y_NAME).output $(COMPILER)
+	$(RM) [A-Z]*-ok.* [A-Z]*-ok
 
 depend: .auto/all_nodes.h
 	$(CXX) $(CXXFLAGS) -MM $(SRC_CPP) > .makedeps
