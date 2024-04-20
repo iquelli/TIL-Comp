@@ -225,18 +225,29 @@ void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node,
 
 void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
-    node->argument()->accept(this, lvl); // determine the value to print
-    if (node->argument()->is_typed(cdk::TYPE_INT)) {
-        _pf.CALL("printi");
-        _pf.TRASH(4); // delete the printed value
-    } else if (node->argument()->is_typed(cdk::TYPE_STRING)) {
-        _pf.CALL("prints");
-        _pf.TRASH(4); // delete the printed value's address
-    } else {
-        std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
-        exit(1);
+    for (size_t i = 0; i < node->arguments()->size(); ++i) {
+        auto child =
+            dynamic_cast<cdk::expression_node *>(node->arguments()->node(i));
+
+        child->accept(this, lvl); // determine the value to print
+        if (child->is_typed(cdk::TYPE_INT)) {
+            _pf.CALL("printi");
+            _pf.TRASH(4); // delete the printed value
+        } else if (child->is_typed(cdk::TYPE_DOUBLE)) {
+            _pf.CALL("printd");
+            _pf.TRASH(8); // delete the printed value
+        } else if (child->is_typed(cdk::TYPE_STRING)) {
+            _pf.CALL("prints");
+            _pf.TRASH(4); // delete the printed value's address
+        } else {
+            std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
+            exit(1);
+        }
     }
-    _pf.CALL("println"); // print a newline
+
+    if (node->newline()) {
+        _pf.CALL("println");
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -245,8 +256,6 @@ void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
     _pf.CALL("readi");
     _pf.LDFVAL32();
-    node->argument()->accept(this, lvl);
-    _pf.STINT();
 }
 
 //---------------------------------------------------------------------------
