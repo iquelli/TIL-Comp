@@ -1,42 +1,34 @@
-#ifndef __SIMPLE_TARGETS_SYMBOL_H__
-#define __SIMPLE_TARGETS_SYMBOL_H__
+#ifndef __TIL_TARGETS_SYMBOL_H__
+#define __TIL_TARGETS_SYMBOL_H__
 
-#include <string>
-#include <memory>
 #include <cdk/types/basic_type.h>
+#include <memory>
+#include <string>
 
 namespace til {
 
-  class symbol {
+class symbol {
     std::shared_ptr<cdk::basic_type> _type;
     std::string _name;
     long _value; // hack!
 
   public:
-    symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name, long value) :
-        _type(type), _name(name), _value(value) {
-    }
+    symbol(std::shared_ptr<cdk::basic_type> type, const std::string &name,
+           long value)
+        : _type(type), _name(name), _value(value) {}
 
     virtual ~symbol() {
-      // EMPTY
+        // EMPTY
     }
 
-    std::shared_ptr<cdk::basic_type> type() const {
-      return _type;
-    }
+    std::shared_ptr<cdk::basic_type> type() const { return _type; }
     bool is_typed(cdk::typename_type name) const {
-      return _type->name() == name;
+        return _type->name() == name;
     }
-    const std::string &name() const {
-      return _name;
-    }
-    long value() const {
-      return _value;
-    }
-    long value(long v) {
-      return _value = v;
-    }
-  };
+    const std::string &name() const { return _name; }
+    long value() const { return _value; }
+    long value(long v) { return _value = v; }
+};
 
 } // til
 

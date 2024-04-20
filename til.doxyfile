@@ -3,7 +3,7 @@
 #---------------------------------------------------------------------------
 # Project related configuration options
 #---------------------------------------------------------------------------
-PROJECT_NAME           = Simple
+PROJECT_NAME           = TIL
 PROJECT_NUMBER         = 
 OUTPUT_DIRECTORY       = doc
 CREATE_SUBDIRS         = NO
@@ -127,7 +127,7 @@ GENERATE_LATEX         = YES
 LATEX_OUTPUT           = latex
 LATEX_CMD_NAME         = latex
 MAKEINDEX_CMD_NAME     = makeindex
-SIMPLE_LATEX          = NO
+TIL_LATEX              = NO
 PAPER_TYPE             = a4wide
 EXTRA_PACKAGES         = 
 LATEX_HEADER           = 
@@ -140,7 +140,7 @@ LATEX_HIDE_INDICES     = NO
 #---------------------------------------------------------------------------
 GENERATE_RTF           = NO
 RTF_OUTPUT             = rtf
-SIMPLE_RTF            = NO
+TIL_RTF                = NO
 RTF_HYPERLINKS         = NO
 RTF_STYLESHEET_FILE    = 
 RTF_EXTENSIONS_FILE    = 

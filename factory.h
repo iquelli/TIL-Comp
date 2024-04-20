@@ -1,5 +1,5 @@
-#ifndef __SIMPLE_FACTORY_H__
-#define __SIMPLE_FACTORY_H__
+#ifndef __TIL_FACTORY_H__
+#define __TIL_FACTORY_H__
 
 #include <memory>
 #include <cdk/yy_factory.h>

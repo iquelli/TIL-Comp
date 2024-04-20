@@ -91,7 +91,7 @@ expr : tINTEGER              { $$ = new cdk::integer_node(LINE, $1); }
      | lval '=' expr         { $$ = new cdk::assignment_node(LINE, $1, $3); }
      ;
 
-lval : tIDENTIFIER             { $$ = new cdk::variable_node(LINE, $1); }
+lval : tIDENTIFIER           { $$ = new cdk::variable_node(LINE, $1); }
      ;
 
 %%

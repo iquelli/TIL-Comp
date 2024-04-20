@@ -1,0 +1,9 @@
+*.o
+*.tab.c
+*.tab.h
+.auto
+/til
+/til_parser.output
+/til_scanner.cpp
+doc
+.vscode
