@@ -220,3 +220,9 @@ void til::type_checker::do_if_else_node(til::if_else_node *const node,
 void til::type_checker::do_next_node(til::next_node *const node, int lvl) {
     // TODO
 }
+
+//---------------------------------------------------------------------------
+
+void til::type_checker::do_sizeof_node(til::sizeof_node *const node, int lvl) {
+    // TODO
+}

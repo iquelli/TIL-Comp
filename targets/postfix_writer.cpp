@@ -302,3 +302,9 @@ void til::postfix_writer::do_if_else_node(til::if_else_node *const node,
 void til::postfix_writer::do_next_node(til::next_node *const node, int lvl) {
     // TODO
 }
+
+//---------------------------------------------------------------------------
+
+void til::postfix_writer::do_sizeof_node(til::sizeof_node *const node, int lvl) {
+    // TODO
+}
