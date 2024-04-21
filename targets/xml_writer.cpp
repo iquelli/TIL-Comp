@@ -222,8 +222,6 @@ void til::xml_writer::do_next_node(til::next_node *const node, int lvl) {
     // TODO
 }
 
-//---------------------------------------------------------------------------
-
 void til::xml_writer::do_stop_node(til::stop_node *const node, int lvl) {
     // TODO
 }
@@ -235,5 +233,11 @@ void til::xml_writer::do_sizeof_node(til::sizeof_node *const node, int lvl) {
 }
 
 void til::xml_writer::do_alloc_node(til::alloc_node *const node, int lvl) {
+    // TODO
+}
+
+//---------------------------------------------------------------------------
+
+void til::xml_writer::do_block_node(til::block_node *const node, int lvl) {
     // TODO
 }

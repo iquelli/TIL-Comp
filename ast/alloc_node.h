@@ -1,6 +1,7 @@
 #ifndef __TIL_AST_ALLOC_NODE_H__
 #define __TIL_AST_ALLOC_NODE_H__
 
+#include <cdk/ast/expression_node.h>
 #include <cdk/ast/unary_operation_node.h>
 
 namespace til {

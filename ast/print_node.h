@@ -1,6 +1,7 @@
 #ifndef __TIL_AST_PRINT_NODE_H__
 #define __TIL_AST_PRINT_NODE_H__
 
+#include <cdk/ast/basic_node.h>
 #include <cdk/ast/sequence_node.h>
 
 namespace til {

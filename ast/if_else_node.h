@@ -1,6 +1,7 @@
 #ifndef __TIL_AST_IF_ELSE_NODE_H__
 #define __TIL_AST_IF_ELSE_NODE_H__
 
+#include <cdk/ast/basic_node.h>
 #include <cdk/ast/expression_node.h>
 
 namespace til {
