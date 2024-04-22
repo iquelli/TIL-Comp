@@ -119,6 +119,10 @@ void til::xml_writer::do_variable_node(cdk::variable_node *const node,
          << "</" << node->label() << ">" << std::endl;
 }
 
+void til::xml_writer::do_index_node(til::index_node *const node, int lvl) {
+    // TODO
+}
+
 void til::xml_writer::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
     openTag(node, lvl);
