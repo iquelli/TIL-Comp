@@ -187,6 +187,11 @@ void til::type_checker::do_function_node(til::function_node *const node,
     // TODO
 }
 
+void til::type_checker::do_function_call_node(
+    til::function_call_node *const node, int lvl) {
+    // TODO
+}
+
 void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
     // TODO
 }
