@@ -10,42 +10,157 @@
 
 // don't change this
 #define yyerror LexerError
+
+#define SAFE_STOI(base) {                         \
+  try {                                           \
+    yylval.i = std::stoi(yytext, nullptr, base);  \
+    return tINTEGER;                              \
+  } catch (const std::out_of_range&) {            \
+    yyerror("Integer overflow");                  \
+  }                                               \
+}
+
+#define SAFE_STOD {                      \
+  try {                                  \
+    yylval.d = std::stod(yytext);        \
+    return tDOUBLE;                      \
+  } catch (const std::out_of_range&) {   \
+    yyerror("Floating point overflow");  \
+  }                                      \
+}
+
 %}
-%x X_STRING
+
+%x X_COMMENT X_STRING X_STRING_IGN X_BACKSLASH
+
 %%
   yydebug=1; set_debug(1);
 
-"--".*                 ; /* ignore comments */
+  /* ====================================================================== */
+  /* ====[                    3.1 - WHITESPACE                        ]==== */
+  /* ====================================================================== */
 
-">="                   return tGE;
-"<="                   return tLE;
-"=="                   return tEQ;
-"!="                   return tNE;
+[ \t\n\r]+ ;
 
-"loop"                 return tLOOP;
-"if"                   return tIF;
-"else"                 return tELSE;
-"read"                 return tREAD;
-"begin"                return tBEGIN;
-"end"                  return tEND;
+  /* ====================================================================== */
+  /* ====[                    3.2 - COMMENTS                          ]==== */
+  /* ====================================================================== */
 
-"print"                return tPRINT;
-"println"              return tPRINTLN;
+";".*             ;
+"/*"              yy_push_state(X_COMMENT);
+<X_COMMENT>"/*"   yy_push_state(X_COMMENT);
+<X_COMMENT>"*/"   yy_pop_state();
+<X_COMMENT>.|"\n" ;
 
-[A-Za-z][A-Za-z0-9_]*  yylval.s = new std::string(yytext); return tIDENTIFIER;
+  /* ====================================================================== */
+  /* ====[                    3.3 - KEYWORDS                          ]==== */
+  /* ====================================================================== */
 
-\'                     yy_push_state(X_STRING); yylval.s = new std::string("");
-<X_STRING>\'           yy_pop_state(); return tSTRING;
-<X_STRING>\\\'         *yylval.s += yytext + 1;
-<X_STRING>.            *yylval.s += yytext;
-<X_STRING>\n           yyerror("newline in string");
+"external" return tEXTERNAL;
+"forward"  return tFORWARD;
+"public"   return tPUBLIC;
+"var"      return tVAR;
 
-[0-9]+                 yylval.i = strtol(yytext, nullptr, 10); return tINTEGER;
+"block"    return tBLOCK;
+"if"       return tIF;
+"loop"     return tLOOP;
+"stop"     return tSTOP;
+"next"     return tNEXT;
+"return"   return tRETURN;
+"print"    return tPRINT;
+"println"  return tPRINTLN;
 
-[-()<>=+*/%;{}.]       return *yytext;
+"read"     return tREAD;
+"null"     return tNULL;
+"set"      return tSET;
+"objects"  return tOBJECTS;
+"sizeof"   return tSIZEOF;
+"function" return tFUNCTION;
 
-[ \t\n]+               ; /* ignore whitespace */
+"program"  return tPROGRAM;
 
-.                      yyerror("Unknown character");
+  /* ====================================================================== */
+  /* ====[                    3.4 - TYPES                             ]==== */
+  /* ====================================================================== */
+
+"int"    return tTYPE_INT;
+"double" return tTYPE_DOUBLE;
+"string" return tTYPE_STRING;
+"void"   return tTYPE_VOID;
+
+  /* ====================================================================== */
+  /* ====[                    FUNCTIONAL                              ]==== */
+  /* ====================================================================== */
+
+@ return *yytext;
+
+  /* ====================================================================== */
+  /* ====[                    3.5 - OPERATORS                         ]==== */
+  /* ====================================================================== */
+
+">="        return tGE;
+"<="        return tLE;
+"=="        return tEQ;
+"!="        return tNE;
+"&&"        return tAND;
+"||"        return tOR;
+[+-?*/%<>~] return *yytext;
+
+  /* ====================================================================== */
+  /* ====[                    3.6 - DELIMITERS AND TERMINATORS        ]==== */
+  /* ====================================================================== */
+
+[()] return *yytext;
+
+  /* ====================================================================== */
+  /* ====[                    3.7 - IDENTIFIERS                       ]==== */
+  /* ====================================================================== */
+
+[A-Za-z][A-Za-z0-9]* yylval.s = new std::string(yytext); return tIDENTIFIER;
+
+  /* ====================================================================== */
+  /* ====[                    3.8.1 - INTEGERS                        ]==== */
+  /* ====================================================================== */
+
+0|[1-9][0-9]*       SAFE_STOI(10);
+0[0-7]+             SAFE_STOI(8);
+0[0-7]*[8-9][0-7]*  yyerror("Invalid octal number");
+
+  /* ====================================================================== */
+  /* ====[                    3.8.2 - FLOATING POINT NUMBERS          ]==== */
+  /* ====================================================================== */
+
+[0-9]+[eE][+-]?[0-9]+                             SAFE_STOD;
+([0-9]*\.[0-9]+|[0-9]+\.[0-9]*)([eE][-+]?[0-9]+)? SAFE_STOD;
+
+  /* ====================================================================== */
+  /* ====[                    3.8.3 - STRINGS                         ]==== */
+  /* ====================================================================== */
+
+\"                           yy_push_state(X_STRING); yylval.s = new std::string("");
+<X_STRING>\"                 yy_pop_state(); return tSTRING;
+<X_STRING>\\                 yy_push_state(X_BACKSLASH);
+<X_STRING>\0                 yyerror("Null byte in string");
+<X_STRING>\n                 yyerror("Newline in string");
+<X_STRING>.                  *yylval.s += yytext;
+
+<X_STRING_IGN>\"             yy_pop_state(); yy_pop_state(); return tSTRING;
+<X_STRING_IGN>\0             yyerror("Null byte in string");
+<X_STRING_IGN>\n             yyerror("Newline in string");
+<X_STRING_IGN>.|\\\"|\\\\    ;
+
+<X_BACKSLASH>n               yy_pop_state(); *yylval.s += '\n';
+<X_BACKSLASH>r               yy_pop_state(); *yylval.s += '\r';
+<X_BACKSLASH>t               yy_pop_state(); *yylval.s += '\t';
+<X_BACKSLASH>0{1,3}          yy_pop_state(); yy_push_state(X_STRING_IGN);
+<X_BACKSLASH>[0-3][0-7]{0,2} yy_pop_state(); *yylval.s += strtoul(yytext, NULL, 8);
+<X_BACKSLASH>[4-7][0-7]{2}   yyerror("Special character overflow");
+<X_BACKSLASH>.               yy_pop_state(); *yylval.s += yytext;
+
+  /* ====================================================================== */
+  /* ====[                    EVERYTHING ELSE                         ]==== */
+  /* ====================================================================== */
+
+. yyerror("Unknown character");
 
 %%
