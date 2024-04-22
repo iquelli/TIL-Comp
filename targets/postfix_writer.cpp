@@ -323,3 +323,8 @@ void til::postfix_writer::do_alloc_node(til::alloc_node *const node, int lvl) {
 void til::postfix_writer::do_block_node(til::block_node *const node, int lvl) {
     // TODO
 }
+
+void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
+                                              int lvl) {
+    // TODO
+}
