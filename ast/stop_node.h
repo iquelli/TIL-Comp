@@ -13,7 +13,7 @@ class stop_node : public cdk::basic_node {
 
   public:
     stop_node(int lineno, int nesting)
-        : basic_node(lineno), _nesting(nesting) {}
+        : cdk::basic_node(lineno), _nesting(nesting) {}
 
     int nesting() { return _nesting; }
 
