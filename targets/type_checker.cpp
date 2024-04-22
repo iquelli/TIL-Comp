@@ -250,6 +250,11 @@ void til::type_checker::do_alloc_node(til::alloc_node *const node, int lvl) {
     // TODO
 }
 
+void til::type_checker::do_address_node(til::address_node *const node,
+                                        int lvl) {
+    // TODO
+}
+
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_block_node(til::block_node *const node, int lvl) {
