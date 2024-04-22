@@ -334,3 +334,9 @@ void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
                                               int lvl) {
     // TODO
 }
+
+//---------------------------------------------------------------------------
+
+void til::postfix_writer::do_null_node(til::null_node *const node, int lvl) {
+    // TODO
+}
