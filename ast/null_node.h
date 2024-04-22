@@ -11,9 +11,8 @@ namespace til {
 class null_node : public cdk::expression_node {
 
   public:
-    inline null_node(int lineno) : expression_node(lineno) {}
+    null_node(int lineno) : expression_node(lineno) {}
 
-  public:
     void accept(basic_ast_visitor *sp, int level) {
         sp->do_null_node(this, level);
     }
