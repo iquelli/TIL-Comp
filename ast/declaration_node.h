@@ -18,12 +18,12 @@ class declaration_node : public cdk::typed_node {
 
   public:
     declaration_node(int lineno, int qualifier,
-                     std::shared_ptr<cdk::basic_type> type,
+                     std::shared_ptr<cdk::basic_type> type_var,
                      const std::string &identifier,
                      cdk::expression_node *initializer)
         : cdk::typed_node(lineno), _qualifier(qualifier),
           _identifier(identifier), _initializer(initializer) {
-        cdk::typed_node::type(type);
+        cdk::typed_node::type(type_var);
     }
 
     int qualifier() { return _qualifier; }
