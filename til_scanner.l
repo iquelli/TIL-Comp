@@ -31,7 +31,7 @@
 
 %}
 
-%x X_COMMENT X_STRING X_STRING_IGN X_BACKSLASH
+%x X_COMMENT X_HEX_INT X_STRING X_STRING_IGN X_BACKSLASH
 
 %%
   yydebug=1; set_debug(1);
@@ -122,9 +122,11 @@
   /* ====[                    3.8.1 - INTEGERS                        ]==== */
   /* ====================================================================== */
 
-0|[1-9][0-9]*       SAFE_STOI(10);
-0[0-7]+             SAFE_STOI(8);
-0[0-7]*[8-9][0-7]*  yyerror("Invalid octal number");
+0|[1-9][0-9]*            SAFE_STOI(10);
+
+"0x"                     yy_push_state(X_HEX_INT);
+<X_HEX_INT>[[:xdigit:]]+ yy_pop_state(); SAFE_STOI(16);
+<X_HEX_INT>.|\n          yyerror("Invalid hexadecimal number");
 
   /* ====================================================================== */
   /* ====[                    3.8.2 - FLOATING POINT NUMBERS          ]==== */
@@ -153,7 +155,7 @@
 <X_BACKSLASH>r               yy_pop_state(); *yylval.s += '\r';
 <X_BACKSLASH>t               yy_pop_state(); *yylval.s += '\t';
 <X_BACKSLASH>0{1,3}          yy_pop_state(); yy_push_state(X_STRING_IGN);
-<X_BACKSLASH>[0-3][0-7]{0,2} yy_pop_state(); *yylval.s += strtoul(yytext, NULL, 8);
+<X_BACKSLASH>[0-3][0-7]{0,2} yy_pop_state(); *yylval.s += strtoul(yytext, NULL, 8); /* max is 255 */
 <X_BACKSLASH>[4-7][0-7]{2}   yyerror("Special character overflow");
 <X_BACKSLASH>.               yy_pop_state(); *yylval.s += yytext;
 
