@@ -251,7 +251,8 @@ void til::xml_writer::do_alloc_node(til::alloc_node *const node, int lvl) {
     // TODO
 }
 
-void til::xml_writer::do_address_node(til::address_node *const node, int lvl) {
+void til::xml_writer::do_address_of_node(til::address_of_node *const node,
+                                         int lvl) {
     // TODO
 }
 

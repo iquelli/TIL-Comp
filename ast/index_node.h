@@ -18,6 +18,7 @@ class index_node : public cdk::lvalue_node {
         : cdk::lvalue_node(lineno), _ptr(ptr), _index(index) {}
 
     cdk::expression_node *ptr() { return _ptr; }
+
     cdk::expression_node *index() { return _index; }
 
     void accept(basic_ast_visitor *sp, int level) {
