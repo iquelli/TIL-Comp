@@ -75,6 +75,7 @@
 "set"      return tSET;
 "objects"  return tOBJECTS;
 "sizeof"   return tSIZEOF;
+"index"    return tINDEX;
 "function" return tFUNCTION;
 
 "program"  return tPROGRAM;
@@ -98,13 +99,13 @@
   /* ====[                    3.5 - OPERATORS                         ]==== */
   /* ====================================================================== */
 
-">="        return tGE;
-"<="        return tLE;
-"=="        return tEQ;
-"!="        return tNE;
-"&&"        return tAND;
-"||"        return tOR;
-[+-?*/%<>~] return *yytext;
+">="         return tGE;
+"<="         return tLE;
+"=="         return tEQ;
+"!="         return tNE;
+"&&"         return tAND;
+"||"         return tOR;
+[+?!*/%<>~-] return *yytext;
 
   /* ====================================================================== */
   /* ====[                    3.6 - DELIMITERS AND TERMINATORS        ]==== */
@@ -122,11 +123,11 @@
   /* ====[                    3.8.1 - INTEGERS                        ]==== */
   /* ====================================================================== */
 
-0|[1-9][0-9]*            SAFE_STOI(10);
-
 "0x"                     yy_push_state(X_HEX_INT);
 <X_HEX_INT>[[:xdigit:]]+ yy_pop_state(); SAFE_STOI(16);
 <X_HEX_INT>.|\n          yyerror("Invalid hexadecimal number");
+
+0|[1-9][0-9]*            SAFE_STOI(10);
 
   /* ====================================================================== */
   /* ====[                    3.8.2 - FLOATING POINT NUMBERS          ]==== */
