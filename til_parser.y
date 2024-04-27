@@ -56,8 +56,8 @@
 %nonassoc '~'
 %nonassoc tUNARY
 
-%type <sequence> global_decls decls instrs exprs
-%type <node> global_decl program decl instr
+%type <sequence> global_decls decls instrs exprs func_args
+%type <node> global_decl program decl instr func_arg
 %type <type> type ref_type void_ref_type func_type return_type
 %type <types> types
 %type <block> decls_instrs
@@ -169,12 +169,12 @@ expr : tINTEGER                      { $$ = new cdk::integer_node(LINE, $1); }
      | '(' '*' expr expr ')'         { $$ = new cdk::mul_node(LINE, $3, $4); }
      | '(' '/' expr expr ')'         { $$ = new cdk::div_node(LINE, $3, $4); }
      | '(' '%' expr expr ')'         { $$ = new cdk::mod_node(LINE, $3, $4); }
-     | '(' '<' expr expr ')'         { $$ = new cdk::lt_node(LINE, $3, $4); }
      | '(' '>' expr expr ')'         { $$ = new cdk::gt_node(LINE, $3, $4); }
-     | '(' tGE expr expr ')'         { $$ = new cdk::ge_node(LINE, $3, $4); }
+     | '(' '<' expr expr ')'         { $$ = new cdk::lt_node(LINE, $3, $4); }
      | '(' tLE expr expr ')'         { $$ = new cdk::le_node(LINE, $3, $4); }
-     | '(' tNE expr expr ')'         { $$ = new cdk::ne_node(LINE, $3, $4); }
+     | '(' tGE expr expr ')'         { $$ = new cdk::ge_node(LINE, $3, $4); }
      | '(' tEQ expr expr ')'         { $$ = new cdk::eq_node(LINE, $3, $4); }
+     | '(' tNE expr expr ')'         { $$ = new cdk::ne_node(LINE, $3, $4); }
      | '(' tAND expr expr ')'        { $$ = new cdk::and_node(LINE, $3, $4); }
      | '(' tOR expr expr ')'         { $$ = new cdk::or_node(LINE, $3, $4); }
      | '(' tOBJECTS expr ')'         { $$ = new til::alloc_node(LINE, $3); }
@@ -193,8 +193,15 @@ lval : tIDENTIFIER              { $$ = new cdk::variable_node(LINE, $1); }
      | '(' tINDEX expr expr ')' { $$ = new til::index_node(LINE, $3, $4); }
      ;
 
-func_def : '(' tFUNCTION '(' return_type       ')' decls_instrs ')' { $$ = new til::function_node(LINE, $4, new cdk::sequence_node(LINE), $6); }
-         | '(' tFUNCTION '(' return_type decls ')' decls_instrs ')' { $$ = new til::function_node(LINE, $4, $5, $7); }
+func_def : '(' tFUNCTION '(' return_type           ')' decls_instrs ')' { $$ = new til::function_node(LINE, $4, new cdk::sequence_node(LINE), $6); }
+         | '(' tFUNCTION '(' return_type func_args ')' decls_instrs ')' { $$ = new til::function_node(LINE, $4, $5, $7); }
+         ;
+
+func_args :           func_arg { $$ = new cdk::sequence_node(LINE, $1); }
+          | func_args func_arg { $$ = new cdk::sequence_node(LINE, $2, $1); }
+          ;
+
+func_arg : '(' type tIDENTIFIER ')' { $$ = new til::declaration_node(LINE, tPRIVATE, $2, *$3, nullptr); delete $3; }
          ;
 
 %%
