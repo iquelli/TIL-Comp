@@ -73,9 +73,9 @@
 "read"     return tREAD;
 "null"     return tNULL;
 "set"      return tSET;
+"index"    return tINDEX;
 "objects"  return tOBJECTS;
 "sizeof"   return tSIZEOF;
-"index"    return tINDEX;
 "function" return tFUNCTION;
 
 "program"  return tPROGRAM;

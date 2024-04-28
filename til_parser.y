@@ -37,23 +37,24 @@
   til::block_node      *block;
 };
 
-%token tEXTERNAL tFORWARD tPUBLIC tPRIVATE tVAR
-%token tBLOCK tIF tLOOP tSTOP tNEXT tRETURN tPRINT tPRINTLN
-%token tREAD tNULL tSET tOBJECTS tSIZEOF tINDEX tFUNCTION
-%token tPROGRAM
-
-%token tTYPE_INT tTYPE_DOUBLE tTYPE_STRING tTYPE_VOID
 %token <i> tINTEGER
 %token <d> tDOUBLE
 %token <s> tIDENTIFIER tSTRING
+%token tTYPE_INT tTYPE_DOUBLE tTYPE_STRING tTYPE_VOID
+%token tEXTERNAL tFORWARD tPUBLIC tPRIVATE tVAR
+%token tBLOCK tIF tLOOP tSTOP tNEXT tRETURN tPRINT tPRINTLN
+%token tREAD tNULL tSET tINDEX tOBJECTS tSIZEOF tFUNCTION
+%token tPROGRAM
 
+// TODO: See what tIFX and tUNARY are and if they are necessary!
 %nonassoc tIFX
-
-%right '='
-%left '>' '<' tGE tLE tEQ tNE tAND tOR
-%left '+' '-'
-%left '*' '/' '%'
-%nonassoc '~'
+%token tAND
+%token tOR
+%token '~'
+%token tEQ tNE
+%token tGE tLE '>' '<'
+%token '+' '-' '?'
+%token '*' '/' '%'
 %nonassoc tUNARY
 
 %type <sequence> global_decls decls instrs exprs func_args
@@ -171,8 +172,8 @@ expr : tINTEGER                      { $$ = new cdk::integer_node(LINE, $1); }
      | '(' '%' expr expr ')'         { $$ = new cdk::mod_node(LINE, $3, $4); }
      | '(' '>' expr expr ')'         { $$ = new cdk::gt_node(LINE, $3, $4); }
      | '(' '<' expr expr ')'         { $$ = new cdk::lt_node(LINE, $3, $4); }
-     | '(' tLE expr expr ')'         { $$ = new cdk::le_node(LINE, $3, $4); }
      | '(' tGE expr expr ')'         { $$ = new cdk::ge_node(LINE, $3, $4); }
+     | '(' tLE expr expr ')'         { $$ = new cdk::le_node(LINE, $3, $4); }
      | '(' tEQ expr expr ')'         { $$ = new cdk::eq_node(LINE, $3, $4); }
      | '(' tNE expr expr ')'         { $$ = new cdk::ne_node(LINE, $3, $4); }
      | '(' tAND expr expr ')'        { $$ = new cdk::and_node(LINE, $3, $4); }
