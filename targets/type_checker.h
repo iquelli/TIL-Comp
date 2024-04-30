@@ -6,7 +6,7 @@
 namespace til {
 
 /**
- * Print nodes as XML elements to the output stream.
+ * Prints a type as a string.
  */
 class type_checker : public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
