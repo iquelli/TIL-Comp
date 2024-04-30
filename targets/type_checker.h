@@ -23,7 +23,8 @@ class type_checker : public basic_ast_visitor {
     ~type_checker() { os().flush(); }
 
   protected:
-    void processUnaryExpression(cdk::unary_operation_node *const node, int lvl);
+    void processUnaryExpression(cdk::unary_operation_node *const node, int lvl,
+                                bool acceptDouble);
     void processBinaryExpression(cdk::binary_operation_node *const node,
                                  int lvl);
     template <typename T>
