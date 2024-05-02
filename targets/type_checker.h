@@ -25,21 +25,17 @@ class type_checker : public basic_ast_visitor {
   protected:
     bool check_compatible_ptr_types(std::shared_ptr<cdk::basic_type> t1,
                                     std::shared_ptr<cdk::basic_type> t2);
-    void processUnaryExpression(cdk::unary_operation_node *const node, int lvl,
-                                bool acceptDouble);
-    bool processBinaryExpression(cdk::binary_operation_node *const node,
+    void process_unary_expr(cdk::unary_operation_node *const node, int lvl,
+                            bool acceptDouble);
+    bool process_binary_expr(cdk::binary_operation_node *const node, int lvl);
+    void process_additive_expr(cdk::binary_operation_node *const node, int lvl,
+                               bool isSubtraction);
+    void process_multiplicative_expr(cdk::binary_operation_node *const node,
+                                     int lvl);
+    void process_comparison_expr(cdk::binary_operation_node *const node,
                                  int lvl);
-    void processAdditiveBinaryExpression(cdk::binary_operation_node *const node,
-                                         int lvl, bool isSubtraction);
-    void processMultiplicativeBinaryExpression(
-        cdk::binary_operation_node *const node, int lvl);
-    void
-    processComparisonBinaryExpression(cdk::binary_operation_node *const node,
-                                      int lvl);
-    void processEqualityBinaryExpression(cdk::binary_operation_node *const node,
-                                         int lvl);
-    void processLogicalBinaryExpression(cdk::binary_operation_node *const node,
-                                        int lvl);
+    void process_equality_expr(cdk::binary_operation_node *const node, int lvl);
+    void process_logical_expr(cdk::binary_operation_node *const node, int lvl);
     template <typename T>
     void process_literal(cdk::literal_node<T> *const node, int lvl) {}
 

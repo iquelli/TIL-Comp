@@ -59,6 +59,7 @@ void til::postfix_writer::do_string_node(cdk::string_node *const node,
 
 void til::postfix_writer::do_null_node(til::null_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 //---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ void til::postfix_writer::do_null_node(til::null_node *const node, int lvl) {
 void til::postfix_writer::do_unary_minus_node(cdk::unary_minus_node *const node,
                                               int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->argument()->accept(this, lvl); // determine the value
     // _pf.NEG();                           // 2-complement
 }
@@ -74,98 +75,101 @@ void til::postfix_writer::do_unary_minus_node(cdk::unary_minus_node *const node,
 void til::postfix_writer::do_unary_plus_node(cdk::unary_plus_node *const node,
                                              int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->argument()->accept(this, lvl); // determine the value
 }
 
 void til::postfix_writer::do_not_node(cdk::not_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_add_node(cdk::add_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.ADD();
 }
 void til::postfix_writer::do_sub_node(cdk::sub_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.SUB();
 }
 void til::postfix_writer::do_mul_node(cdk::mul_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.MUL();
 }
 void til::postfix_writer::do_div_node(cdk::div_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.DIV();
 }
 void til::postfix_writer::do_mod_node(cdk::mod_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.MOD();
 }
 void til::postfix_writer::do_lt_node(cdk::lt_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.LT();
 }
 void til::postfix_writer::do_le_node(cdk::le_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.LE();
 }
 void til::postfix_writer::do_ge_node(cdk::ge_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.GE();
 }
 void til::postfix_writer::do_gt_node(cdk::gt_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.GT();
 }
 void til::postfix_writer::do_ne_node(cdk::ne_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.NE();
 }
 void til::postfix_writer::do_eq_node(cdk::eq_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->left()->accept(this, lvl);
     // node->right()->accept(this, lvl);
     // _pf.EQ();
 }
 void til::postfix_writer::do_and_node(cdk::and_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 void til::postfix_writer::do_or_node(cdk::or_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 //---------------------------------------------------------------------------
@@ -173,19 +177,20 @@ void til::postfix_writer::do_or_node(cdk::or_node *const node, int lvl) {
 void til::postfix_writer::do_variable_node(cdk::variable_node *const node,
                                            int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // // simplified generation: all variables are global
     // _pf.ADDR(node->name());
 }
 
 void til::postfix_writer::do_index_node(til::index_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node,
                                          int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->lvalue()->accept(this, lvl);
     // _pf.LDINT(); // depends on type size
 }
@@ -193,7 +198,7 @@ void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node,
 void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node,
                                              int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->rvalue()->accept(this, lvl); // determine the new value
     // _pf.DUP32();
     // if (new_symbol() == nullptr) {
@@ -215,6 +220,7 @@ void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node,
 void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
                                               int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 void til::postfix_writer::do_function_node(til::function_node *const node,
@@ -251,11 +257,13 @@ void til::postfix_writer::do_function_node(til::function_node *const node,
 void til::postfix_writer::do_function_call_node(
     til::function_call_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 void til::postfix_writer::do_return_node(til::return_node *const node,
                                          int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 //---------------------------------------------------------------------------
@@ -263,7 +271,7 @@ void til::postfix_writer::do_return_node(til::return_node *const node,
 void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node,
                                              int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // node->argument()->accept(this, lvl); // determine the value
     // if (node->argument()->is_typed(cdk::TYPE_INT)) {
     //     _pf.TRASH(4); // delete the evaluated value
@@ -279,35 +287,35 @@ void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node,
 
 void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
-    // for (size_t i = 0; i < node->arguments()->size(); ++i) {
-    //     auto child =
-    //         dynamic_cast<cdk::expression_node *>(node->arguments()->node(i));
+    ASSERT_SAFE_EXPRESSIONS;
+    for (size_t i = 0; i < node->arguments()->size(); ++i) {
+        auto child =
+            dynamic_cast<cdk::expression_node *>(node->arguments()->node(i));
 
-    //     child->accept(this, lvl); // determine the value to print
-    //     if (child->is_typed(cdk::TYPE_INT)) {
-    //         _pf.CALL("printi");
-    //         _pf.TRASH(4); // delete the printed value
-    //     } else if (child->is_typed(cdk::TYPE_DOUBLE)) {
-    //         _pf.CALL("printd");
-    //         _pf.TRASH(8); // delete the printed value
-    //     } else if (child->is_typed(cdk::TYPE_STRING)) {
-    //         _pf.CALL("prints");
-    //         _pf.TRASH(4); // delete the printed value's address
-    //     } else {
-    //         std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
-    //         exit(1);
-    //     }
-    // }
+        child->accept(this, lvl); // determine the value to print
+        if (child->is_typed(cdk::TYPE_INT)) {
+            _pf.CALL("printi");
+            _pf.TRASH(4); // delete the printed value
+        } else if (child->is_typed(cdk::TYPE_DOUBLE)) {
+            _pf.CALL("printd");
+            _pf.TRASH(8); // delete the printed value
+        } else if (child->is_typed(cdk::TYPE_STRING)) {
+            _pf.CALL("prints");
+            _pf.TRASH(4); // delete the printed value's address
+        } else {
+            std::cerr << "ERROR: CANNOT HAPPEN!" << std::endl;
+            exit(1);
+        }
+    }
 
-    // if (node->newline()) {
-    //     _pf.CALL("println");
-    // }
+    if (node->newline()) {
+        _pf.CALL("println");
+    }
 }
 
 void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // _pf.CALL("readi");
     // _pf.LDFVAL32();
 }
@@ -316,7 +324,7 @@ void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
 
 void til::postfix_writer::do_if_node(til::if_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // int lbl1;
     // node->condition()->accept(this, lvl);
     // _pf.JZ(mklbl(lbl1 = ++_lbl));
@@ -327,7 +335,7 @@ void til::postfix_writer::do_if_node(til::if_node *const node, int lvl) {
 void til::postfix_writer::do_if_else_node(til::if_else_node *const node,
                                           int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // int lbl1, lbl2;
     // node->condition()->accept(this, lvl);
     // _pf.JZ(mklbl(lbl1 = ++_lbl));
@@ -342,7 +350,7 @@ void til::postfix_writer::do_if_else_node(til::if_else_node *const node,
 
 void til::postfix_writer::do_loop_node(til::loop_node *const node, int lvl) {
     // TODO
-    // ASSERT_SAFE_EXPRESSIONS;
+    ASSERT_SAFE_EXPRESSIONS;
     // int lbl1, lbl2;
     // _pf.LABEL(mklbl(lbl1 = ++_lbl));
     // node->condition()->accept(this, lvl);
@@ -365,13 +373,16 @@ void til::postfix_writer::do_stop_node(til::stop_node *const node, int lvl) {
 void til::postfix_writer::do_sizeof_node(til::sizeof_node *const node,
                                          int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 void til::postfix_writer::do_alloc_node(til::alloc_node *const node, int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
 
 void til::postfix_writer::do_address_of_node(til::address_of_node *const node,
                                              int lvl) {
     // TODO
+    ASSERT_SAFE_EXPRESSIONS;
 }
