@@ -25,11 +25,9 @@ class type_checker : public basic_ast_visitor {
   protected:
     bool check_compatible_ptr_types(std::shared_ptr<cdk::basic_type> t1,
                                     std::shared_ptr<cdk::basic_type> t2);
-    void typeDealer(std::shared_ptr<cdk::basic_type> t1,
-                    std::shared_ptr<cdk::basic_type> t2);
     void processUnaryExpression(cdk::unary_operation_node *const node, int lvl,
                                 bool acceptDouble);
-    void processBinaryExpression(cdk::binary_operation_node *const node,
+    bool processBinaryExpression(cdk::binary_operation_node *const node,
                                  int lvl);
     void processAdditiveBinaryExpression(cdk::binary_operation_node *const node,
                                          int lvl, bool isSubtraction);
