@@ -1,8 +1,9 @@
 #include "targets/type_checker.h"
 #include ".auto/all_nodes.h" // automatically generated
 #include <cdk/types/primitive_type.h>
-#include <cdk/types/reference_type.h>
 #include <string>
+
+#include "til_parser.tab.h"
 
 #define ASSERT_UNSPEC                                                          \
     {                                                                          \

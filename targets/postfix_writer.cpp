@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 
+#include "til_parser.tab.h"
+
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_nil_node(cdk::nil_node *const node, int lvl) {
