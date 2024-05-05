@@ -1,5 +1,6 @@
 #include "targets/postfix_writer.h"
 #include ".auto/all_nodes.h" // all_nodes.h is automatically generated
+#include "targets/frame_size_calculator.h"
 #include "targets/type_checker.h"
 #include <sstream>
 #include <string>
