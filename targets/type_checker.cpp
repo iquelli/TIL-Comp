@@ -405,9 +405,20 @@ void til::type_checker::do_variable_node(cdk::variable_node *const node,
 }
 
 void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
-    // TODO
     ASSERT_UNSPEC;
-    // node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+
+    node->ptr()->accept(this, lvl + 2);
+    if (!node->ptr()->is_typed(cdk::TYPE_POINTER))
+        throw std::string("wrong type in base of index expression");
+
+    node->index()->accept(this, lvl + 2);
+    if (!node->index()->is_typed(cdk::TYPE_INT))
+        throw std::string("wrong type in index of index expression");
+
+    const auto base_ref =
+        cdk::reference_type::cast(node->ptr()->type())->referenced();
+
+    node->type(base_ref);
 }
 
 void til::type_checker::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
