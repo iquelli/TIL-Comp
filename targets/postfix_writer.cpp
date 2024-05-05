@@ -499,49 +499,107 @@ void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_if_node(til::if_node *const node, int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // int lbl1;
-    // node->condition()->accept(this, lvl);
-    // _pf.JZ(mklbl(lbl1 = ++_lbl));
-    // node->block()->accept(this, lvl + 2);
-    // _pf.LABEL(mklbl(lbl1));
+
+    int lbl;
+
+    node->condition()->accept(this, lvl);
+    _pf.JZ(mklbl(lbl = ++_lbl));
+
+    node->block()->accept(this, lvl + 2);
+    _lastBlockInstrSeen =
+        false; // in case it's not a block_node, but a single instruction
+
+    _pf.ALIGN();
+    _pf.LABEL(mklbl(lbl));
 }
 
 void til::postfix_writer::do_if_else_node(til::if_else_node *const node,
                                           int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // int lbl1, lbl2;
-    // node->condition()->accept(this, lvl);
-    // _pf.JZ(mklbl(lbl1 = ++_lbl));
-    // node->thenblock()->accept(this, lvl + 2);
-    // _pf.JMP(mklbl(lbl2 = ++_lbl));
-    // _pf.LABEL(mklbl(lbl1));
-    // node->elseblock()->accept(this, lvl + 2);
-    // _pf.LABEL(mklbl(lbl1 = lbl2));
+
+    int lbl1, lbl2;
+
+    node->condition()->accept(this, lvl);
+    _pf.JZ(mklbl(lbl1 = ++_lbl));
+
+    node->thenblock()->accept(this, lvl + 2);
+    _lastBlockInstrSeen =
+        false; // in case it's not a block_node, but a single instruction
+
+    _pf.JMP(mklbl(lbl2 = ++_lbl));
+    _pf.ALIGN();
+    _pf.LABEL(mklbl(lbl1));
+
+    node->elseblock()->accept(this, lvl + 2);
+    _lastBlockInstrSeen =
+        false; // in case it's not a block_node, but a single instruction
+
+    _pf.ALIGN();
+    _pf.LABEL(mklbl(lbl1 = lbl2));
 }
 
 //---------------------------------------------------------------------------
 
 void til::postfix_writer::do_loop_node(til::loop_node *const node, int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // int lbl1, lbl2;
-    // _pf.LABEL(mklbl(lbl1 = ++_lbl));
-    // node->condition()->accept(this, lvl);
-    // _pf.JZ(mklbl(lbl2 = ++_lbl));
-    // node->block()->accept(this, lvl + 2);
-    // _pf.JMP(mklbl(lbl1));
-    // _pf.LABEL(mklbl(lbl2));
+
+    int condLbl, endLbl;
+
+    _pf.ALIGN();
+    _pf.LABEL(mklbl(condLbl = ++_lbl)); // label for loop condition
+    node->condition()->accept(this, lvl);
+    _pf.JZ(mklbl(endLbl = ++_lbl)); // jump to the exit if false
+
+    _loopCond.push_back(condLbl); // the deepest loop condition label
+    _loopEnd.push_back(endLbl);   // the deepest loop end label
+
+    node->block()->accept(this, lvl + 2);
+    _lastBlockInstrSeen =
+        false; // in case it's not a block_node, but a single instruction
+
+    _loopCond.pop_back();
+    _loopEnd.pop_back();
+
+    _pf.JMP(mklbl(condLbl)); // repeat
+    _pf.ALIGN();
+    _pf.LABEL(mklbl(endLbl)); // label for end of loop
 }
 
 void til::postfix_writer::do_next_node(til::next_node *const node, int lvl) {
-    // TODO
+    const auto loopLabels = _loopCond.size();
+    if (loopLabels == 0) {
+        error(node->lineno(), "next node found outside a loop block");
+        return;
+    }
+
+    const size_t nextNesting = (size_t)node->nesting();
+    if (nextNesting < 1 || nextNesting > loopLabels) {
+        error(node->lineno(), "invalid next nesting");
+        return;
+    }
+
+    _lastBlockInstrSeen = true;
+    const auto loopCondLbl = _loopCond[loopLabels - nextNesting];
+    _pf.JMP(mklbl(loopCondLbl));
 }
 
 void til::postfix_writer::do_stop_node(til::stop_node *const node, int lvl) {
-    // TODO
+    const auto loopLabels = _loopCond.size();
+    if (loopLabels == 0) {
+        error(node->lineno(), "stop node found outside a loop block");
+        return;
+    }
+
+    const size_t stopNesting = (size_t)node->nesting();
+    if (stopNesting < 1 || stopNesting > loopLabels) {
+        error(node->lineno(), "invalid stop nesting");
+        return;
+    }
+
+    _lastBlockInstrSeen = true;
+    const auto loopEndLbl = _loopEnd[loopLabels - stopNesting];
+    _pf.JMP(mklbl(loopEndLbl));
 }
 
 //---------------------------------------------------------------------------

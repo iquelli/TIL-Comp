@@ -24,6 +24,9 @@ class postfix_writer : public basic_ast_visitor {
     bool _inFunctionBody = false;
     bool _lastBlockInstrSeen = false;
 
+    /** Loop labels used for next/stop nodes */
+    std::vector<int> _loopCond, _loopEnd;
+
     /**
      * A forwarded function label, that is going to be called and not branched.
      */
