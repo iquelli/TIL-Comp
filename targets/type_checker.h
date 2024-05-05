@@ -6,7 +6,7 @@
 namespace til {
 
 /**
- * Prints a type as a string.
+ * Traverse syntax tree and check types.
  */
 class type_checker : public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;

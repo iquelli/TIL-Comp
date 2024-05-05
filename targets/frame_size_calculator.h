@@ -8,6 +8,9 @@
 
 namespace til {
 
+/**
+ * Finds the size of a function's frame.
+ */
 class frame_size_calculator : public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
 
@@ -33,22 +36,5 @@ class frame_size_calculator : public basic_ast_visitor {
 };
 
 } // til
-
-//---------------------------------------------------------------------------
-//     HELPER MACRO FOR TYPE CHECKING
-//---------------------------------------------------------------------------
-
-#define CHECK_TYPES(compiler, symtab, node)                                    \
-    {                                                                          \
-        try {                                                                  \
-            til::type_checker checker(compiler, symtab, this);                 \
-            (node)->accept(&checker, 0);                                       \
-        } catch (const std::string &problem) {                                 \
-            std::cerr << (node)->lineno() << ": " << problem << std::endl;     \
-            return;                                                            \
-        }                                                                      \
-    }
-
-#define ASSERT_SAFE_EXPRESSIONS CHECK_TYPES(_compiler, _symtab, node)
 
 #endif

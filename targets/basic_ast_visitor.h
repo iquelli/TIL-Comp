@@ -14,9 +14,9 @@
 #undef __NODE_DECLARATIONS_ONLY__
 /* do not edit -- end */
 
-//!
-//! Print nodes as XML elements to the output stream.
-//!
+/**
+ * Base class of the hierarchy of node visitors.
+ */
 class basic_ast_visitor {
   protected:
     //! The owner compiler
