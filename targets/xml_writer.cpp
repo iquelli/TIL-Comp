@@ -209,7 +209,7 @@ void til::xml_writer::do_declaration_node(til::declaration_node *const node,
 void til::xml_writer::do_function_node(til::function_node *const node,
                                        int lvl) {
     os() << std::string(lvl, ' ') << "<" << node->label() << " type='"
-         << cdk::to_string(node->type()) << "' main='" << std::noboolalpha
+         << type_name(node->type()) << "' main='" << std::noboolalpha
          << node->main() << std::boolalpha << "'>" << std::endl;
 
     if (node->arguments()) {
@@ -231,8 +231,9 @@ void til::xml_writer::do_function_call_node(til::function_call_node *const node,
 
     openTag("function", lvl + 2);
     // if the function is NULL, the call is recursive
-    if (node->func())
+    if (node->func()) {
         node->func()->accept(this, lvl + 4);
+    }
     closeTag("function", lvl + 2);
 
     if (node->arguments()) {
@@ -343,13 +344,13 @@ void til::xml_writer::do_loop_node(til::loop_node *const node, int lvl) {
 }
 
 void til::xml_writer::do_next_node(til::next_node *const node, int lvl) {
-    os() << std::string(lvl, ' ') << "<" << node->label() << " level='"
+    os() << std::string(lvl, ' ') << "<" << node->label() << " nesting='"
          << node->nesting() << "'>" << std::endl;
     closeTag(node, lvl);
 }
 
 void til::xml_writer::do_stop_node(til::stop_node *const node, int lvl) {
-    os() << std::string(lvl, ' ') << "<" << node->label() << " level='"
+    os() << std::string(lvl, ' ') << "<" << node->label() << " nesting='"
          << node->nesting() << "'>" << std::endl;
     closeTag(node, lvl);
 }
