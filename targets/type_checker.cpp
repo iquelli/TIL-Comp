@@ -24,6 +24,111 @@ bool til::type_checker::check_compatible_ptr_types(
            t2_ptr->name() == cdk::TYPE_UNSPEC;
 }
 
+bool til::type_checker::check_compatible_functional_types(
+    std::shared_ptr<cdk::functional_type> t1,
+    std::shared_ptr<cdk::functional_type> t2) {
+    // the return type must be compatible
+    if ((t1->output_length() > 0 && t2->output_length() > 0) &&
+        !check_compatible_types(t1->output(0), t2->output(0), false))
+        return false;
+
+    // the number of arguments must be the same
+    if (t1->input_length() != t2->input_length())
+        return false;
+
+    // the types of the arguments must be compatible
+    for (size_t i = 0; i < t1->input_length(); i++)
+        if (!check_compatible_types(t1->input(i), t2->input(i), false))
+            return false;
+    return true;
+}
+
+bool til::type_checker::check_compatible_types(
+    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2,
+    bool is_return) {
+    const auto t1_name = t1->name();
+    const auto t2_name = t2->name();
+    switch (t1_name) {
+    case cdk::TYPE_INT:
+    case cdk::TYPE_DOUBLE:
+        if (!(t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT))
+            return false;
+        break;
+    case cdk::TYPE_STRING:
+        if (t2_name != cdk::TYPE_STRING)
+            return false;
+        break;
+    case cdk::TYPE_POINTER:
+        if (is_return == (t2_name == cdk::TYPE_POINTER) &&
+            !check_compatible_ptr_types(t1, t2))
+            return false;
+        break;
+    case cdk::TYPE_FUNCTIONAL:
+        if (!((t2_name == cdk::TYPE_FUNCTIONAL &&
+               check_compatible_functional_types(
+                   cdk::functional_type::cast(t1),
+                   cdk::functional_type::cast(t2))) ||
+              (t2_name == cdk::TYPE_POINTER &&
+               cdk::reference_type::cast(t2)->referenced() == nullptr)))
+            return false;
+        break;
+    case cdk::TYPE_UNSPEC: // useful for auto cases
+        if (t2_name == cdk::TYPE_VOID)
+            // auto x = f(), where f calls return void, is not allowed
+            return false;
+        break;
+    default:
+        if (t1_name != t2_name)
+            return false;
+    }
+    return true;
+}
+
+void til::type_checker::change_type_on_match(cdk::typed_node *const lvalue,
+                                             cdk::typed_node *const rvalue) {
+    const auto ltype = lvalue->type();
+    const auto rtype = rvalue->type();
+
+    if (ltype->name() == cdk::TYPE_UNSPEC &&
+        rtype->name() == cdk::TYPE_UNSPEC) {
+        // assign default type
+        lvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+        rvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if ((ltype->name() == cdk::TYPE_POINTER &&
+                rtype->name() == cdk::TYPE_POINTER &&
+                check_compatible_ptr_types(ltype, rtype)) ||
+               (ltype->name() == cdk::TYPE_FUNCTIONAL &&
+                rtype->name() == cdk::TYPE_FUNCTIONAL &&
+                check_compatible_functional_types(
+                    cdk::functional_type::cast(ltype),
+                    cdk::functional_type::cast(rtype))) ||
+               ((ltype->name() == cdk::TYPE_INT ||
+                 ltype->name() == cdk::TYPE_DOUBLE) &&
+                rtype->name() == cdk::TYPE_UNSPEC)) {
+        rvalue->type(ltype);
+    }
+}
+
+void til::type_checker::throw_incompatible_types(
+    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
+    if (check_compatible_types(t1, t2, false))
+        return;
+
+    switch (t1->name()) {
+    case cdk::TYPE_INT:
+    case cdk::TYPE_DOUBLE:
+        throw std::string("wrong type (expected double or int)");
+    case cdk::TYPE_STRING:
+        throw std::string("wrong type (expected string)");
+    case cdk::TYPE_POINTER:
+        throw std::string("wrong type (expected pointer)");
+    case cdk::TYPE_FUNCTIONAL:
+        throw std::string("wrong type (expected function)");
+    default:
+        throw std::string("unknown type");
+    }
+}
+
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_nil_node(cdk::nil_node *const node, int lvl) {
@@ -317,34 +422,17 @@ void til::type_checker::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
 
 void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
                                            int lvl) {
-    // TODO
     ASSERT_UNSPEC;
 
     node->lvalue()->accept(this, lvl + 2);
     node->rvalue()->accept(this, lvl + 2);
 
-    // try {
-    //     node->lvalue()->accept(this, lvl);
-    // } catch (const std::string &id) {
-    //     auto symbol = std::make_shared<til::symbol>(
-    //         cdk::primitive_type::create(4, cdk::TYPE_INT), id, 0);
-    //     _symtab.insert(id, symbol);
-    //     _parent->set_new_symbol(
-    //         symbol); // advise parent that a symbol has been inserted
-    //     node->lvalue()->accept(this, lvl); // DAVID: bah!
-    // }
+    change_type_on_match(node->lvalue(), node->rvalue());
+    const auto lval_type = node->lvalue()->type();
+    const auto rval_type = node->rvalue()->type();
 
-    // if (!node->lvalue()->is_typed(cdk::TYPE_INT))
-    //     throw std::string(
-    //         "wrong type in left argument of assignment expression");
-
-    // node->rvalue()->accept(this, lvl + 2);
-    // if (!node->rvalue()->is_typed(cdk::TYPE_INT))
-    //     throw std::string(
-    //         "wrong type in right argument of assignment expression");
-
-    // // in Simple, expressions are always int
-    // node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    throw_incompatible_types(lval_type, rval_type);
+    node->type(lval_type);
 }
 
 //---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 #ifndef __TIL_TARGETS_TYPE_CHECKER_H__
 #define __TIL_TARGETS_TYPE_CHECKER_H__
 
+#include ".auto/all_nodes.h"
 #include "targets/basic_ast_visitor.h"
 
 namespace til {
@@ -25,6 +26,16 @@ class type_checker : public basic_ast_visitor {
   protected:
     bool check_compatible_ptr_types(std::shared_ptr<cdk::basic_type> t1,
                                     std::shared_ptr<cdk::basic_type> t2);
+    void change_type_on_match(cdk::typed_node *const lvalue,
+                              cdk::typed_node *const rvalue);
+    bool
+    check_compatible_functional_types(std::shared_ptr<cdk::functional_type> t1,
+                                      std::shared_ptr<cdk::functional_type> t2);
+    bool check_compatible_types(std::shared_ptr<cdk::basic_type> t1,
+                                std::shared_ptr<cdk::basic_type> t2,
+                                bool is_return);
+    void throw_incompatible_types(std::shared_ptr<cdk::basic_type> t1,
+                                  std::shared_ptr<cdk::basic_type> t2);
     void process_unary_expr(cdk::unary_operation_node *const node, int lvl,
                             bool acceptDouble);
     bool process_binary_expr(cdk::binary_operation_node *const node, int lvl);
