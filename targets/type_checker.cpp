@@ -74,7 +74,7 @@ bool til::type_checker::check_compatible_types(
         break;
     case cdk::TYPE_UNSPEC: // useful for auto cases
         if (t2_name == cdk::TYPE_VOID)
-            // auto x = f(), where f calls return void, is not allowed
+            // var x = f(), where f calls return void, is not allowed
             return false;
         break;
     default:
@@ -450,7 +450,32 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
 
 void til::type_checker::do_declaration_node(til::declaration_node *const node,
                                             int lvl) {
-    // TODO
+    const auto &init = node->initializer();
+    if (init) {
+        init->accept(this, lvl + 2);
+        if (node->type()) {
+            change_type_on_match(node, init);
+            throw_incompatible_types(node->type(), init->type());
+            if (node->type()->name() == cdk::TYPE_UNSPEC)
+                node->type(init->type());
+        } else {
+            node->type(init->type());
+        }
+    }
+
+    const auto new_symbol =
+        til::make_symbol(node->type(), node->identifier(),
+                         (bool)node->initializer(), node->qualifier());
+    if (!_symtab.insert(node->identifier(), new_symbol)) {
+        // in this case, we are redeclaring a variable
+        const auto previous_symbol = _symtab.find_local(node->identifier());
+        // the redeclared type must be the exact same
+        if (previous_symbol->type()->name() != node->type()->name())
+            throw std::string("cannot redeclare variable '" +
+                              node->identifier() + "' with incompatible type");
+        _symtab.replace(node->identifier(), new_symbol);
+    }
+    _parent->set_new_symbol(new_symbol);
 }
 
 void til::type_checker::do_function_node(til::function_node *const node,
@@ -460,11 +485,80 @@ void til::type_checker::do_function_node(til::function_node *const node,
 
 void til::type_checker::do_function_call_node(
     til::function_call_node *const node, int lvl) {
-    // TODO
+    ASSERT_UNSPEC;
+    std::vector<std::shared_ptr<cdk::basic_type>> args_types;
+
+    if (node->func()) { // regular call
+        node->func()->accept(this, lvl + 2);
+        if (!(node->func()->is_typed(cdk::TYPE_FUNCTIONAL)))
+            throw std::string("wrong type in function call expression");
+
+        const auto &type = node->func()->type();
+        args_types = cdk::functional_type::cast(type)->input()->components();
+        node->type(cdk::functional_type::cast(type)->output(0));
+    } else { // recursive call (@)
+        auto symbol = _symtab.find("@");
+        if (!symbol) {
+            throw std::string(
+                "recursive call not allowed in the current scope");
+        }
+        const auto &type = symbol->type();
+        args_types = cdk::functional_type::cast(type)->input()->components();
+        node->type(cdk::functional_type::cast(type)->output(0));
+    }
+
+    if (node->arguments()) {
+        if (args_types.size() != node->arguments()->size())
+            throw std::string(
+                "wrong number of arguments in function call expression");
+        node->arguments()->accept(this, lvl + 2);
+
+        for (size_t i = 0; i < args_types.size(); i++) {
+            const auto &param_type =
+                dynamic_cast<cdk::expression_node *>(node->arguments()->node(i))
+                    ->type();
+            // note that the second condition is to allow passing an int as a
+            // double
+            if ((args_types[i] == param_type) ||
+                (args_types[i]->name() == cdk::TYPE_DOUBLE &&
+                 param_type->name() == cdk::TYPE_INT))
+                continue;
+            throw std::string(
+                "wrong type in argument of function call expression");
+        }
+    }
 }
 
 void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
-    // TODO
+    const auto function = _symtab.find("@");
+    const auto ret_val = node->retval();
+    if (!function) { // we may be in main
+        const auto main = _symtab.find("_main");
+        if (main) {
+            if (!ret_val)
+                throw std::string(
+                    "wrong type of return value in main (int expected)");
+            ret_val->accept(this, lvl + 2);
+            if (!ret_val->is_typed(cdk::TYPE_INT))
+                throw std::string(
+                    "wrong type of return value in main (int expected)");
+            return;
+        }
+        throw std::string("return statement found outside function");
+    } else if (!ret_val) {
+        return;
+    }
+
+    const auto &fun_sym_type = cdk::functional_type::cast(function->type());
+    const auto function_output = fun_sym_type->output(0);
+    const bool has_output = fun_sym_type->output() != nullptr;
+    if (has_output && function_output->name() == cdk::TYPE_VOID)
+        throw std::string("return with a value in void function");
+    else if (!has_output)
+        throw std::string("unknown return type in function");
+
+    ret_val->accept(this, lvl + 2);
+    throw_incompatible_types(function_output, ret_val->type());
 }
 
 //---------------------------------------------------------------------------
