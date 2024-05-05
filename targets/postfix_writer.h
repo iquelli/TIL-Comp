@@ -24,6 +24,11 @@ class postfix_writer : public basic_ast_visitor {
     bool _inFunctionBody = false;
     bool _lastBlockInstrSeen = false;
 
+    /**
+     * A forwarded function label, that is going to be called and not branched.
+     */
+    std::string _currentForwardLabel;
+
     /** To have access to a function's segments. */
     std::vector<std::string> _functionLabels;
 

@@ -321,10 +321,20 @@ void til::postfix_writer::do_or_node(cdk::or_node *const node, int lvl) {
 
 void til::postfix_writer::do_variable_node(cdk::variable_node *const node,
                                            int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // // simplified generation: all variables are global
-    // _pf.ADDR(node->name());
+
+    const auto symbol = _symtab.find(node->name());
+
+    // a symbol may be forwarded from another module, global or local
+    if (symbol->qualifier() == tEXTERNAL) {
+        // if it's been forwarded, we will call it instead of branching to it,
+        // so as such, we'll need its label
+        _currentForwardLabel = symbol->name();
+    } else if (symbol->is_global()) {
+        _pf.ADDR(symbol->name());
+    } else {
+        _pf.LOCAL(symbol->offset());
+    }
 }
 
 void til::postfix_writer::do_index_node(til::index_node *const node, int lvl) {
@@ -339,30 +349,41 @@ void til::postfix_writer::do_index_node(til::index_node *const node, int lvl) {
 
 void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node,
                                          int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // node->lvalue()->accept(this, lvl);
-    // _pf.LDINT(); // depends on type size
+
+    node->lvalue()->accept(this, lvl);
+    if (!node->is_typed(cdk::TYPE_DOUBLE)) {
+        // integers, pointers, strings, functionals
+        // if we're dealing with forwarded methods, we will call them by their
+        // label and not branch to them, therefore loading them is useless
+        if (_currentForwardLabel.empty()) {
+            _pf.LDINT();
+        }
+    } else {
+        _pf.LDDOUBLE();
+    }
 }
 
 void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node,
                                              int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // node->rvalue()->accept(this, lvl); // determine the new value
-    // _pf.DUP32();
-    // if (new_symbol() == nullptr) {
-    //     node->lvalue()->accept(this, lvl); // where to store the value
-    // } else {
-    //     _pf.DATA();  // variables are all global and live in DATA
-    //     _pf.ALIGN(); // make sure we are aligned
-    //     _pf.LABEL(new_symbol()->name()); // name variable location
-    //     reset_new_symbol();
-    //     _pf.SINT(0);                       // initialize it to 0 (zero)
-    //     _pf.TEXT();                        // return to the TEXT segment
-    //     node->lvalue()->accept(this, lvl); // DAVID: bah!
-    // }
-    // _pf.STINT(); // store the value at address
+
+    node->rvalue()->accept(this, lvl + 2);
+    if (!node->is_typed(cdk::TYPE_DOUBLE)) {
+        _pf.DUP32();
+    } else {
+        if (node->rvalue()->is_typed(cdk::TYPE_INT)) {
+            _pf.I2D();
+        }
+        _pf.DUP64();
+    }
+
+    node->lvalue()->accept(this, lvl + 2);
+    if (!node->is_typed(cdk::TYPE_DOUBLE)) {
+        _pf.STINT();
+    } else {
+        _pf.STDOUBLE();
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -459,10 +480,20 @@ void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
 }
 
 void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
-    // _pf.CALL("readi");
-    // _pf.LDFVAL32();
+
+    if (node->is_typed(cdk::TYPE_INT) || node->is_typed(cdk::TYPE_UNSPEC)) {
+        // UNSPEC is for cases like `(var x (read))`
+        _functionsToDeclare.insert("readi");
+        _pf.CALL("readi");
+        _pf.LDFVAL32();
+    } else if (node->is_typed(cdk::TYPE_DOUBLE)) {
+        _functionsToDeclare.insert("readd");
+        _pf.CALL("readd");
+        _pf.LDFVAL64();
+    } else {
+        error(node->lineno(), "read expression cannot read unknown type");
+    }
 }
 
 //---------------------------------------------------------------------------
