@@ -285,7 +285,7 @@ void til::type_checker::process_multiplicative_expr(
     cdk::binary_operation_node *const node, int lvl) {
     ASSERT_UNSPEC;
 
-    if (process_binary_expr(node, lvl)) {
+    if (!process_binary_expr(node, lvl)) {
         throw std::string("wrong types in multiplicative binary expression");
     }
 }
