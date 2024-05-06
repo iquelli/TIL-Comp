@@ -29,7 +29,7 @@ bool til::type_checker::check_compatible_functional_types(
     std::shared_ptr<cdk::functional_type> t2) {
     // the return type must be compatible
     if ((t1->output_length() > 0 && t2->output_length() > 0) &&
-        !check_compatible_types(t1->output(0), t2->output(0), false)) {
+        !check_compatible_types(t1->output(0), t2->output(0))) {
         return false;
     }
 
@@ -40,7 +40,7 @@ bool til::type_checker::check_compatible_functional_types(
 
     // the types of the arguments must be compatible
     for (size_t i = 0; i < t1->input_length(); i++) {
-        if (!check_compatible_types(t1->input(i), t2->input(i), false)) {
+        if (!check_compatible_types(t1->input(i), t2->input(i))) {
             return false;
         }
     }
@@ -48,14 +48,13 @@ bool til::type_checker::check_compatible_functional_types(
 }
 
 bool til::type_checker::check_compatible_types(
-    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2,
-    bool is_return) {
+    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
     const auto t1_name = t1->name();
     const auto t2_name = t2->name();
     switch (t1_name) {
     case cdk::TYPE_INT:
     case cdk::TYPE_DOUBLE:
-        if (!(t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT)) {
+        if (t2_name != cdk::TYPE_DOUBLE && t2_name != cdk::TYPE_INT) {
             return false;
         }
         break;
@@ -65,7 +64,7 @@ bool til::type_checker::check_compatible_types(
         }
         break;
     case cdk::TYPE_POINTER:
-        if (is_return == (t2_name == cdk::TYPE_POINTER) &&
+        if (t2_name != cdk::TYPE_POINTER ||
             !check_compatible_ptr_types(t1, t2)) {
             return false;
         }
@@ -96,44 +95,45 @@ bool til::type_checker::check_compatible_types(
 
 void til::type_checker::change_type_on_match(cdk::typed_node *const lvalue,
                                              cdk::typed_node *const rvalue) {
-    const auto ltype = lvalue->type();
-    const auto rtype = rvalue->type();
+    const auto lval_type = lvalue->type();
+    const auto rval_type = rvalue->type();
 
-    if (ltype->name() == cdk::TYPE_UNSPEC &&
-        rtype->name() == cdk::TYPE_UNSPEC) {
+    if (lval_type->name() == cdk::TYPE_UNSPEC &&
+        rval_type->name() == cdk::TYPE_UNSPEC) {
         // assign default type
         lvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
         rvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
-    } else if ((ltype->name() == cdk::TYPE_POINTER &&
-                rtype->name() == cdk::TYPE_POINTER &&
-                check_compatible_ptr_types(ltype, rtype)) ||
-               (ltype->name() == cdk::TYPE_FUNCTIONAL &&
-                rtype->name() == cdk::TYPE_FUNCTIONAL &&
+    } else if ((lval_type->name() == cdk::TYPE_POINTER &&
+                rval_type->name() == cdk::TYPE_POINTER &&
+                check_compatible_ptr_types(lval_type, rval_type)) ||
+               (lval_type->name() == cdk::TYPE_FUNCTIONAL &&
+                rval_type->name() == cdk::TYPE_FUNCTIONAL &&
                 check_compatible_functional_types(
-                    cdk::functional_type::cast(ltype),
-                    cdk::functional_type::cast(rtype))) ||
-               ((ltype->name() == cdk::TYPE_INT ||
-                 ltype->name() == cdk::TYPE_DOUBLE) &&
-                rtype->name() == cdk::TYPE_UNSPEC)) {
-        rvalue->type(ltype);
+                    cdk::functional_type::cast(lval_type),
+                    cdk::functional_type::cast(rval_type))) ||
+               ((lval_type->name() == cdk::TYPE_INT ||
+                 lval_type->name() == cdk::TYPE_DOUBLE) &&
+                rval_type->name() == cdk::TYPE_UNSPEC)) {
+        rvalue->type(lval_type);
     }
 }
 
 void til::type_checker::throw_incompatible_types(
     std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
-    if (check_compatible_types(t1, t2, false))
+    if (check_compatible_types(t1, t2)) {
         return;
+    }
 
     switch (t1->name()) {
     case cdk::TYPE_INT:
     case cdk::TYPE_DOUBLE:
-        throw std::string("wrong type (expected double or int)");
+        throw std::string("wrong type: expected double or int");
     case cdk::TYPE_STRING:
-        throw std::string("wrong type (expected string)");
+        throw std::string("wrong type: expected string");
     case cdk::TYPE_POINTER:
-        throw std::string("wrong type (expected pointer)");
+        throw std::string("wrong type: expected pointer");
     case cdk::TYPE_FUNCTIONAL:
-        throw std::string("wrong type (expected function)");
+        throw std::string("wrong type: expected function");
     default:
         throw std::string("unknown type");
     }
@@ -419,7 +419,7 @@ void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
 
     node->ptr()->accept(this, lvl + 2);
     if (!node->ptr()->is_typed(cdk::TYPE_POINTER)) {
-        throw std::string("wrong type in base of index expression");
+        throw std::string("wrong type in ptr of index expression");
     }
 
     node->index()->accept(this, lvl + 2);
@@ -427,10 +427,10 @@ void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
         throw std::string("wrong type in index of index expression");
     }
 
-    const auto base_ref =
+    const auto ptr_ref =
         cdk::reference_type::cast(node->ptr()->type())->referenced();
 
-    node->type(base_ref);
+    node->type(ptr_ref);
 }
 
 void til::type_checker::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
