@@ -390,50 +390,379 @@ void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node,
 
 void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
                                               int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
+
+    const auto id = node->identifier();
+    const auto type_size = node->type()->size(); // size in bytes
+    int offset = 0;                              // will be kept 0 if global
+
+    // to understand offset logic, read: wiki +
+    // https://people.cs.rutgers.edu/~pxk/419/notes/frames.html
+    if (_inFunctionArgs) {
+        // the function's arguments are placed in the stack by the caller
+        offset = _offset;
+        _offset += type_size;
+    } else if (_inFunctionBody) {
+        // the function's local variables are placed in the stack by the callee
+        _offset -= type_size;
+        offset = _offset;
+    }
+
+    const auto symbol = new_symbol();
+    if (symbol) {
+        symbol->set_offset(offset);
+        reset_new_symbol();
+    }
+
+    // we may still need to initialize the variable
+    if (node->initializer()) {
+        if (_inFunctionBody)
+            process_local_var_init(symbol, node->initializer(), lvl);
+        else
+            process_global_var_init(symbol, node->initializer(), lvl);
+        _symbolsToDeclare.erase(symbol->name());
+    } else if (!_inFunctionArgs && !_inFunctionBody)
+        _symbolsToDeclare.insert(symbol->name());
+}
+void til::postfix_writer::process_local_var_init(
+    std::shared_ptr<til::symbol> symbol,
+    cdk::expression_node *const initializer, int lvl) {
+    initializer->accept(this, lvl);
+    switch (symbol->type()->name()) {
+    case cdk::TYPE_INT:
+    case cdk::TYPE_STRING:
+    case cdk::TYPE_POINTER:
+    case cdk::TYPE_FUNCTIONAL:
+    case cdk::TYPE_UNSPEC: // cases such as `auto x = input;`
+        _pf.LOCAL(symbol->offset());
+        _pf.STINT();
+        break;
+    case cdk::TYPE_DOUBLE:
+        if (initializer->is_typed(cdk::TYPE_INT)) {
+            _pf.I2D();
+        }
+        _pf.LOCAL(symbol->offset());
+        _pf.STDOUBLE();
+        break;
+    default:
+        error(initializer->lineno(),
+              "invalid type for variable initialization");
+    }
+}
+void til::postfix_writer::process_global_var_init(
+    std::shared_ptr<til::symbol> symbol,
+    cdk::expression_node *const initializer, int lvl) {
+    switch (symbol->type()->name()) {
+    case cdk::TYPE_INT:
+    case cdk::TYPE_STRING:
+    case cdk::TYPE_POINTER:
+        _pf.DATA(); // Data segment, for global variables
+        _pf.ALIGN();
+        _pf.LABEL(symbol->name());
+        initializer->accept(this, lvl + 2);
+        break;
+    case cdk::TYPE_DOUBLE:
+        _pf.DATA(); // Data segment, for global variables
+        _pf.ALIGN();
+        _pf.LABEL(symbol->name());
+
+        // the following initializations need to be done outside of the switch
+        const cdk::integer_node *dclini;
+        cdk::double_node *ddi;
+        switch (initializer->type()->name()) {
+        case cdk::TYPE_INT:
+            // here, we actually want to initialize the variable with a double
+            // thus, we need to convert the expression to a double node
+            // NOTE: I don't like these variable names either, taken from DM
+            dclini = dynamic_cast<const cdk::integer_node *>(initializer);
+            ddi = new cdk::double_node(dclini->lineno(), dclini->value());
+            ddi->accept(this, lvl + 2);
+            break;
+        case cdk::TYPE_DOUBLE:
+            initializer->accept(this, lvl + 2);
+            break;
+        default:
+            error(initializer->lineno(),
+                  "invalid type for double variable initialization");
+        }
+        break;
+    case cdk::TYPE_FUNCTIONAL:
+        _functions.push_back(symbol);
+        initializer->accept(this, lvl);
+        _pf.DATA(); // Data segment, for global variables
+        _pf.ALIGN();
+        if (symbol->qualifier() == tPUBLIC)
+            _pf.GLOBAL(symbol->name(), _pf.OBJ());
+        _pf.LABEL(symbol->name());
+        _pf.SADDR(_functionLabels.back());
+        break;
+    default:
+        error(initializer->lineno(),
+              "invalid type for variable initialization");
+    }
 }
 
 void til::postfix_writer::do_function_node(til::function_node *const node,
                                            int lvl) {
-    // TODO
-    // Note that Simple doesn't have functions. Thus, it doesn't need
-    // a function node. However, it must start in the main function.
-    // The ProgramNode (representing the whole program) doubles as a
-    // main function node.
+    node->main() ? process_main_function(node, lvl)
+                 : process_normal_function(node, lvl);
+}
+void til::postfix_writer::process_main_function(til::function_node *const node,
+                                                int lvl) {
+    for (auto s_name : _symbolsToDeclare) {
+        const auto symbol = _symtab.find(s_name);
+        if (symbol->qualifier() == tEXTERNAL) {
+            _functionsToDeclare.insert(s_name);
+            continue;
+        }
 
-    // generate the main function (RTS mandates that its name be "_main")
-    // _pf.TEXT();
-    // _pf.ALIGN();
-    // _pf.GLOBAL("_main", _pf.FUNC());
-    // _pf.LABEL("_main");
-    // _pf.ENTER(0); // Simple doesn't implement local variables
+        _pf.BSS();
+        _pf.ALIGN();
+        _pf.LABEL(s_name);
+        _pf.SALLOC(symbol->type()->size());
+    }
 
-    // node->statements()->accept(this, lvl);
+    // Note that it's ok to name the function _main, as no variable may have
+    // underscores
+    const auto main =
+        til::make_symbol(cdk::functional_type::create(
+                             cdk::primitive_type::create(4, cdk::TYPE_INT)),
+                         "_main", 0, tPRIVATE);
+    _symtab.insert(main->name(), main);
+    _functions.push_back(main);
+    _functionLabels.push_back("_main");
 
-    // end the main function
-    // _pf.INT(0);
-    // _pf.STFVAL32();
-    // _pf.LEAVE();
-    // _pf.RET();
+    // generate the main function itself
+    _symtab.push(); // entering new context
+    _pf.TEXT("_main");
+    _pf.ALIGN();
+    _pf.GLOBAL("_main", _pf.FUNC());
+    _pf.LABEL("_main");
 
-    // these are just a few library function imports
-    // _pf.EXTERN("readi");
-    // _pf.EXTERN("printi");
-    // _pf.EXTERN("prints");
-    // _pf.EXTERN("println");
+    // compute stack size to be reserved for local variables
+    frame_size_calculator fsc(_compiler, _symtab);
+    node->accept(&fsc, lvl);
+    _pf.ENTER(fsc.localsize());
+
+    _inFunctionBody = true;
+    node->block()->accept(this, lvl + 2);
+    _inFunctionBody = false;
+
+    _symtab.pop(); // leaving context
+
+    _functionLabels.pop_back();
+    _functions.pop_back();
+    if (!_mainReturnSeen) {
+        _pf.INT(0);
+        _pf.STFVAL32();
+    }
+    _pf.LEAVE();
+    _pf.RET();
+
+    for (auto forwarded_function : _functionsToDeclare) {
+        _pf.EXTERN(forwarded_function);
+    }
+}
+void til::postfix_writer::process_normal_function(
+    til::function_node *const node, int lvl) {
+    _symtab.push(); // args scope
+    auto function = til::make_symbol(node->type(), "@", 0, tPRIVATE);
+    if (_symtab.find_local(function->name())) {
+        _symtab.replace(function->name(), function);
+    } else {
+        _symtab.insert(function->name(), function);
+    }
+    _functions.push_back(function);
+
+    const auto functionLabel = mklbl(++_lbl);
+    _functionLabels.push_back(functionLabel);
+
+    const auto previous_offset = _offset;
+    // prepare for arguments (4: remember to account for return address)
+    _offset = 8;
+
+    if (node->arguments()) {
+        _inFunctionArgs = true;
+        for (size_t ix = 0; ix < node->arguments()->size(); ix++) {
+            node->arguments()->node(ix)->accept(this, lvl);
+        }
+        _inFunctionArgs = false;
+    }
+
+    _pf.TEXT(functionLabel);
+    _pf.ALIGN();
+    _pf.LABEL(functionLabel);
+
+    // compute stack size to be reserved for local variables
+    frame_size_calculator fsc(_compiler, _symtab);
+    node->accept(&fsc, lvl);
+    _pf.ENTER(fsc.localsize());
+
+    _offset = 0; // reset offset, prepare for local variables
+    auto _previouslyInFunctionBody = _inFunctionBody;
+    _inFunctionBody = true;
+    if (node->block()) {
+        node->block()->accept(this, lvl + 2);
+    }
+    _inFunctionBody = _previouslyInFunctionBody;
+    _symtab.pop(); // leaving args scope
+    _offset = previous_offset;
+
+    if (function) {
+        _functions.pop_back();
+    }
+
+    _pf.LEAVE();
+    _pf.RET();
+
+    if (_inFunctionBody) {
+        _functionLabels.pop_back();
+        _pf.TEXT(_functionLabels.back());
+        _pf.ADDR(functionLabel);
+    }
 }
 
 void til::postfix_writer::do_function_call_node(
     til::function_call_node *const node, int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
+
+    std::vector<std::shared_ptr<cdk::basic_type>> arg_types;
+    const auto function = node->func();
+    if (node->func()) {
+        // in non recursive calls, the arguments are already stored in the node
+        // itself
+        arg_types =
+            cdk::functional_type::cast(function->type())->input()->components();
+    } else { // recursive call -> @
+        // in recursive calls, we'll want to fetch the symbol associated with
+        // the deepest function we can find, and retrieve its arguments
+        auto deepest_function = _functions.back();
+        arg_types = cdk::functional_type::cast(deepest_function->type())
+                        ->input()
+                        ->components();
+    }
+
+    size_t args_size = 0; // size of all the arguments in bytes
+    if (node->arguments()) {
+        for (int i = node->arguments()->size() - 1; i >= 0; --i) {
+            auto arg = dynamic_cast<cdk::expression_node *>(
+                node->arguments()->node(i));
+            arg->accept(this, lvl + 2);
+            if (arg_types[i]->name() == cdk::TYPE_DOUBLE &&
+                arg->type()->name() == cdk::TYPE_INT) {
+                args_size +=
+                    4;     // if we're passing an integer where a double is
+                           // expected, we need to allocate 4 additional bytes
+                _pf.I2D(); // also need to convert integer to double
+            }
+            args_size += arg->type()->size();
+        }
+    }
+
+    // there are 3 cases now: we may want to do a recursive, non-recursive
+    // "regular", or forwarded call
+    if (function) {
+        // non-recursive calls
+        _currentForwardLabel.clear();
+        // if we accept a forwarded function, the label will once again be set
+        function->accept(this, lvl + 2);
+        if (_currentForwardLabel.empty()) // it's a "regular" non-recursive call
+            _pf.BRANCH();
+        else // it's a forwarded call
+            _pf.CALL(_currentForwardLabel);
+    } else {
+        // recursive calls
+        _pf.CALL(_functionLabels.back());
+    }
+
+    if (args_size > 0) {
+        // removes no-longer-needed arguments from the stack
+        _pf.TRASH(args_size);
+    }
+
+    switch (node->type()->name()) {
+    case cdk::TYPE_VOID:
+        break;
+    case cdk::TYPE_INT:
+        if (_currentForwardLabel.empty()) {
+            // the second part of allowing covariance to happen (with the first
+            // one being handled in the return node's visitor) there, we make
+            // every non-main int-returning function actually return a double
+            // here, we convert that double back to an int, as it is the
+            // callee's responsibility to properly cast the return values
+            _pf.LDFVAL64();
+            _pf.D2I();
+        } else {
+            // note how in forwarded methods we don't need to do any conversion,
+            // as the return value is already an int
+            _pf.LDFVAL32();
+        }
+        break;
+    case cdk::TYPE_STRING:
+    case cdk::TYPE_POINTER:
+    case cdk::TYPE_FUNCTIONAL:
+        _pf.LDFVAL32();
+        break;
+    case cdk::TYPE_DOUBLE:
+        _pf.LDFVAL64();
+        break;
+    default: // can't happen!
+        error(node->lineno(), "cannot call expression of unknown type");
+    }
+
+    _currentForwardLabel
+        .clear(); // we're done with this label, so we can clear it
 }
 
 void til::postfix_writer::do_return_node(til::return_node *const node,
                                          int lvl) {
-    // TODO
     ASSERT_SAFE_EXPRESSIONS;
+
+    // should not reach here without returning a value (if not void)
+    const auto current_function_type_name =
+        cdk::functional_type::cast(_functions.back()->type())
+            ->output(0)
+            ->name();
+
+    if (current_function_type_name != cdk::TYPE_VOID) {
+        node->retval()->accept(this, lvl + 2);
+        switch (current_function_type_name) {
+        case cdk::TYPE_INT:
+            // allowing covariant return types (i.e., double is considered a
+            // valid return type to cast from int) we'll always return doubles
+            // from non-main functions instead of ints, to allow covariance the
+            // second part of this logic is handled in the function call's
+            // visitor, where we _load_ the return value, which should be the
+            // address of the first instruction of the function being called
+            // !!! the exception is main, since it returns 0 (int) per
+            // convention
+            if (_functions.back()->is_main()) {
+                _mainReturnSeen = true;
+                _pf.STFVAL32();
+            } else {
+                _pf.I2D();
+                _pf.STFVAL64();
+            }
+            break;
+        case cdk::TYPE_STRING:
+        case cdk::TYPE_POINTER:
+        case cdk::TYPE_FUNCTIONAL:
+            _pf.STFVAL32(); // removes 4 bytes from the stack
+            break;
+        case cdk::TYPE_DOUBLE:
+            if (!node->retval()->is_typed(cdk::TYPE_DOUBLE)) {
+                _pf.I2D(); // converts int to double
+            }
+            _pf.STFVAL64(); // removes 8 bytes (a double) from the stack
+            break;
+        default:
+            error(node->lineno(), "invalid return type");
+        }
+    }
+
+    _lastBlockInstrSeen = true;
+    _pf.LEAVE();
+    _pf.RET();
 }
 
 //---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ namespace til {
 class postfix_writer : public basic_ast_visitor {
     cdk::symbol_table<til::symbol> &_symtab;
     std::set<std::string> _functionsToDeclare;
+    std::set<std::string> _symbolsToDeclare;
 
     /** Code generation. */
     cdk::basic_postfix_emitter &_pf;
@@ -22,6 +23,8 @@ class postfix_writer : public basic_ast_visitor {
 
     /** Semantic analysis. */
     bool _inFunctionBody = false;
+    bool _inFunctionArgs = false;
+    bool _mainReturnSeen = false;
     bool _lastBlockInstrSeen = false;
 
     /** Loop labels used for next/stop nodes */
@@ -34,6 +37,12 @@ class postfix_writer : public basic_ast_visitor {
 
     /** To have access to a function's segments. */
     std::vector<std::string> _functionLabels;
+
+    /** Keeps track of functions along with their arguments. */
+    std::vector<std::shared_ptr<til::symbol>> _functions;
+
+    /** Current fp offset. 0 means no defined variables. */
+    int _offset = 0;
 
   public:
     postfix_writer(std::shared_ptr<cdk::compiler> compiler,
@@ -66,6 +75,16 @@ class postfix_writer : public basic_ast_visitor {
                                      int lvl);
     void process_comparison_expr(cdk::binary_operation_node *const node,
                                  int lvl);
+
+    void process_local_var_init(std::shared_ptr<til::symbol> symbol,
+                                cdk::expression_node *const initializer,
+                                int lvl);
+    void process_global_var_init(std::shared_ptr<til::symbol> symbol,
+                                 cdk::expression_node *const initializer,
+                                 int lvl);
+
+    void process_main_function(til::function_node *const node, int lvl);
+    void process_normal_function(til::function_node *const node, int lvl);
 
   public:
     // do not edit these lines
