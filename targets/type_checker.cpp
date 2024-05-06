@@ -29,17 +29,21 @@ bool til::type_checker::check_compatible_functional_types(
     std::shared_ptr<cdk::functional_type> t2) {
     // the return type must be compatible
     if ((t1->output_length() > 0 && t2->output_length() > 0) &&
-        !check_compatible_types(t1->output(0), t2->output(0), false))
+        !check_compatible_types(t1->output(0), t2->output(0), false)) {
         return false;
+    }
 
     // the number of arguments must be the same
-    if (t1->input_length() != t2->input_length())
+    if (t1->input_length() != t2->input_length()) {
         return false;
+    }
 
     // the types of the arguments must be compatible
-    for (size_t i = 0; i < t1->input_length(); i++)
-        if (!check_compatible_types(t1->input(i), t2->input(i), false))
+    for (size_t i = 0; i < t1->input_length(); i++) {
+        if (!check_compatible_types(t1->input(i), t2->input(i), false)) {
             return false;
+        }
+    }
     return true;
 }
 
@@ -51,17 +55,20 @@ bool til::type_checker::check_compatible_types(
     switch (t1_name) {
     case cdk::TYPE_INT:
     case cdk::TYPE_DOUBLE:
-        if (!(t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT))
+        if (!(t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT)) {
             return false;
+        }
         break;
     case cdk::TYPE_STRING:
-        if (t2_name != cdk::TYPE_STRING)
+        if (t2_name != cdk::TYPE_STRING) {
             return false;
+        }
         break;
     case cdk::TYPE_POINTER:
         if (is_return == (t2_name == cdk::TYPE_POINTER) &&
-            !check_compatible_ptr_types(t1, t2))
+            !check_compatible_ptr_types(t1, t2)) {
             return false;
+        }
         break;
     case cdk::TYPE_FUNCTIONAL:
         if (!((t2_name == cdk::TYPE_FUNCTIONAL &&
@@ -69,17 +76,20 @@ bool til::type_checker::check_compatible_types(
                    cdk::functional_type::cast(t1),
                    cdk::functional_type::cast(t2))) ||
               (t2_name == cdk::TYPE_POINTER &&
-               cdk::reference_type::cast(t2)->referenced() == nullptr)))
+               cdk::reference_type::cast(t2)->referenced() == nullptr))) {
             return false;
+        }
         break;
-    case cdk::TYPE_UNSPEC: // useful for auto cases
-        if (t2_name == cdk::TYPE_VOID)
-            // var x = f(), where f calls return void, is not allowed
+    case cdk::TYPE_UNSPEC: // useful for var cases
+        if (t2_name == cdk::TYPE_VOID) {
+            // (var x (f)), where f calls return void, is not allowed
             return false;
+        }
         break;
     default:
-        if (t1_name != t2_name)
+        if (t1_name != t2_name) {
             return false;
+        }
     }
     return true;
 }
@@ -408,12 +418,14 @@ void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
     ASSERT_UNSPEC;
 
     node->ptr()->accept(this, lvl + 2);
-    if (!node->ptr()->is_typed(cdk::TYPE_POINTER))
+    if (!node->ptr()->is_typed(cdk::TYPE_POINTER)) {
         throw std::string("wrong type in base of index expression");
+    }
 
     node->index()->accept(this, lvl + 2);
-    if (!node->index()->is_typed(cdk::TYPE_INT))
+    if (!node->index()->is_typed(cdk::TYPE_INT)) {
         throw std::string("wrong type in index of index expression");
+    }
 
     const auto base_ref =
         cdk::reference_type::cast(node->ptr()->type())->referenced();
@@ -456,8 +468,9 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
         if (node->type()) {
             change_type_on_match(node, init);
             throw_incompatible_types(node->type(), init->type());
-            if (node->type()->name() == cdk::TYPE_UNSPEC)
+            if (node->type()->name() == cdk::TYPE_UNSPEC) {
                 node->type(init->type());
+            }
         } else {
             node->type(init->type());
         }
@@ -470,9 +483,10 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
         // in this case, we are redeclaring a variable
         const auto previous_symbol = _symtab.find_local(node->identifier());
         // the redeclared type must be the exact same
-        if (previous_symbol->type()->name() != node->type()->name())
+        if (previous_symbol->type()->name() != node->type()->name()) {
             throw std::string("cannot redeclare variable '" +
                               node->identifier() + "' with incompatible type");
+        }
         _symtab.replace(node->identifier(), new_symbol);
     }
     _parent->set_new_symbol(new_symbol);
@@ -490,8 +504,9 @@ void til::type_checker::do_function_call_node(
 
     if (node->func()) { // regular call
         node->func()->accept(this, lvl + 2);
-        if (!(node->func()->is_typed(cdk::TYPE_FUNCTIONAL)))
+        if (!node->func()->is_typed(cdk::TYPE_FUNCTIONAL)) {
             throw std::string("wrong type in function call expression");
+        }
 
         const auto &type = node->func()->type();
         args_types = cdk::functional_type::cast(type)->input()->components();
@@ -508,9 +523,10 @@ void til::type_checker::do_function_call_node(
     }
 
     if (node->arguments()) {
-        if (args_types.size() != node->arguments()->size())
+        if (args_types.size() != node->arguments()->size()) {
             throw std::string(
                 "wrong number of arguments in function call expression");
+        }
         node->arguments()->accept(this, lvl + 2);
 
         for (size_t i = 0; i < args_types.size(); i++) {
@@ -521,8 +537,9 @@ void til::type_checker::do_function_call_node(
             // double
             if ((args_types[i] == param_type) ||
                 (args_types[i]->name() == cdk::TYPE_DOUBLE &&
-                 param_type->name() == cdk::TYPE_INT))
+                 param_type->name() == cdk::TYPE_INT)) {
                 continue;
+            }
             throw std::string(
                 "wrong type in argument of function call expression");
         }
@@ -535,13 +552,15 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
     if (!function) { // we may be in main
         const auto main = _symtab.find("_main");
         if (main) {
-            if (!ret_val)
+            if (!ret_val) {
                 throw std::string(
                     "wrong type of return value in main (int expected)");
+            }
             ret_val->accept(this, lvl + 2);
-            if (!ret_val->is_typed(cdk::TYPE_INT))
+            if (!ret_val->is_typed(cdk::TYPE_INT)) {
                 throw std::string(
                     "wrong type of return value in main (int expected)");
+            }
             return;
         }
         throw std::string("return statement found outside function");
@@ -552,10 +571,11 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
     const auto &fun_sym_type = cdk::functional_type::cast(function->type());
     const auto function_output = fun_sym_type->output(0);
     const bool has_output = fun_sym_type->output() != nullptr;
-    if (has_output && function_output->name() == cdk::TYPE_VOID)
+    if (has_output && function_output->name() == cdk::TYPE_VOID) {
         throw std::string("return with a value in void function");
-    else if (!has_output)
+    } else if (!has_output) {
         throw std::string("unknown return type in function");
+    }
 
     ret_val->accept(this, lvl + 2);
     throw_incompatible_types(function_output, ret_val->type());

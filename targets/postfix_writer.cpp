@@ -393,17 +393,13 @@ void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
     ASSERT_SAFE_EXPRESSIONS;
 
     const auto id = node->identifier();
-    const auto type_size = node->type()->size(); // size in bytes
-    int offset = 0;                              // will be kept 0 if global
+    const auto type_size = node->type()->size(); // bytes
+    int offset = 0;                              // 0 is global
 
-    // to understand offset logic, read: wiki +
-    // https://people.cs.rutgers.edu/~pxk/419/notes/frames.html
     if (_inFunctionArgs) {
-        // the function's arguments are placed in the stack by the caller
         offset = _offset;
         _offset += type_size;
     } else if (_inFunctionBody) {
-        // the function's local variables are placed in the stack by the callee
         _offset -= type_size;
         offset = _offset;
     }
@@ -414,15 +410,16 @@ void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
         reset_new_symbol();
     }
 
-    // we may still need to initialize the variable
     if (node->initializer()) {
-        if (_inFunctionBody)
+        if (_inFunctionBody) {
             process_local_var_init(symbol, node->initializer(), lvl);
-        else
+        } else {
             process_global_var_init(symbol, node->initializer(), lvl);
+        }
         _symbolsToDeclare.erase(symbol->name());
-    } else if (!_inFunctionArgs && !_inFunctionBody)
+    } else if (!_inFunctionArgs && !_inFunctionBody) {
         _symbolsToDeclare.insert(symbol->name());
+    }
 }
 void til::postfix_writer::process_local_var_init(
     std::shared_ptr<til::symbol> symbol,
@@ -433,7 +430,7 @@ void til::postfix_writer::process_local_var_init(
     case cdk::TYPE_STRING:
     case cdk::TYPE_POINTER:
     case cdk::TYPE_FUNCTIONAL:
-    case cdk::TYPE_UNSPEC: // cases such as `auto x = input;`
+    case cdk::TYPE_UNSPEC: // cases like `(var x (read))`
         _pf.LOCAL(symbol->offset());
         _pf.STINT();
         break;
@@ -446,7 +443,7 @@ void til::postfix_writer::process_local_var_init(
         break;
     default:
         error(initializer->lineno(),
-              "invalid type for variable initialization");
+              "variable initialization has invalid type");
     }
 }
 void til::postfix_writer::process_global_var_init(
@@ -456,24 +453,21 @@ void til::postfix_writer::process_global_var_init(
     case cdk::TYPE_INT:
     case cdk::TYPE_STRING:
     case cdk::TYPE_POINTER:
-        _pf.DATA(); // Data segment, for global variables
+        _pf.DATA();
         _pf.ALIGN();
         _pf.LABEL(symbol->name());
         initializer->accept(this, lvl + 2);
         break;
     case cdk::TYPE_DOUBLE:
-        _pf.DATA(); // Data segment, for global variables
+        _pf.DATA();
         _pf.ALIGN();
         _pf.LABEL(symbol->name());
 
-        // the following initializations need to be done outside of the switch
         const cdk::integer_node *dclini;
         cdk::double_node *ddi;
         switch (initializer->type()->name()) {
         case cdk::TYPE_INT:
-            // here, we actually want to initialize the variable with a double
-            // thus, we need to convert the expression to a double node
-            // NOTE: I don't like these variable names either, taken from DM
+            // essentially cast the int into a double
             dclini = dynamic_cast<const cdk::integer_node *>(initializer);
             ddi = new cdk::double_node(dclini->lineno(), dclini->value());
             ddi->accept(this, lvl + 2);
@@ -483,22 +477,23 @@ void til::postfix_writer::process_global_var_init(
             break;
         default:
             error(initializer->lineno(),
-                  "invalid type for double variable initialization");
+                  "double variable initialization has invalid type");
         }
         break;
     case cdk::TYPE_FUNCTIONAL:
         _functions.push_back(symbol);
         initializer->accept(this, lvl);
-        _pf.DATA(); // Data segment, for global variables
+        _pf.DATA();
         _pf.ALIGN();
-        if (symbol->qualifier() == tPUBLIC)
+        if (symbol->qualifier() == tPUBLIC) {
             _pf.GLOBAL(symbol->name(), _pf.OBJ());
+        }
         _pf.LABEL(symbol->name());
         _pf.SADDR(_functionLabels.back());
         break;
     default:
         error(initializer->lineno(),
-              "invalid type for variable initialization");
+              "variable initialization has invalid type");
     }
 }
 
@@ -522,8 +517,6 @@ void til::postfix_writer::process_main_function(til::function_node *const node,
         _pf.SALLOC(symbol->type()->size());
     }
 
-    // Note that it's ok to name the function _main, as no variable may have
-    // underscores
     const auto main =
         til::make_symbol(cdk::functional_type::create(
                              cdk::primitive_type::create(4, cdk::TYPE_INT)),
@@ -532,14 +525,13 @@ void til::postfix_writer::process_main_function(til::function_node *const node,
     _functions.push_back(main);
     _functionLabels.push_back("_main");
 
-    // generate the main function itself
-    _symtab.push(); // entering new context
+    _symtab.push(); // new context for the main function
     _pf.TEXT("_main");
     _pf.ALIGN();
     _pf.GLOBAL("_main", _pf.FUNC());
     _pf.LABEL("_main");
 
-    // compute stack size to be reserved for local variables
+    // calculate the stack size for local variables
     frame_size_calculator fsc(_compiler, _symtab);
     node->accept(&fsc, lvl);
     _pf.ENTER(fsc.localsize());
@@ -548,7 +540,7 @@ void til::postfix_writer::process_main_function(til::function_node *const node,
     node->block()->accept(this, lvl + 2);
     _inFunctionBody = false;
 
-    _symtab.pop(); // leaving context
+    _symtab.pop(); // leave the context
 
     _functionLabels.pop_back();
     _functions.pop_back();
@@ -565,7 +557,7 @@ void til::postfix_writer::process_main_function(til::function_node *const node,
 }
 void til::postfix_writer::process_normal_function(
     til::function_node *const node, int lvl) {
-    _symtab.push(); // args scope
+    _symtab.push(); // arguments context
     auto function = til::make_symbol(node->type(), "@", 0, tPRIVATE);
     if (_symtab.find_local(function->name())) {
         _symtab.replace(function->name(), function);
@@ -578,7 +570,6 @@ void til::postfix_writer::process_normal_function(
     _functionLabels.push_back(functionLabel);
 
     const auto previous_offset = _offset;
-    // prepare for arguments (4: remember to account for return address)
     _offset = 8;
 
     if (node->arguments()) {
@@ -593,19 +584,19 @@ void til::postfix_writer::process_normal_function(
     _pf.ALIGN();
     _pf.LABEL(functionLabel);
 
-    // compute stack size to be reserved for local variables
+    // calculate the stack size for local variables
     frame_size_calculator fsc(_compiler, _symtab);
     node->accept(&fsc, lvl);
     _pf.ENTER(fsc.localsize());
 
-    _offset = 0; // reset offset, prepare for local variables
+    _offset = 0; // reset offset
     auto _previouslyInFunctionBody = _inFunctionBody;
     _inFunctionBody = true;
     if (node->block()) {
         node->block()->accept(this, lvl + 2);
     }
     _inFunctionBody = _previouslyInFunctionBody;
-    _symtab.pop(); // leaving args scope
+    _symtab.pop(); // leave arguments context
     _offset = previous_offset;
 
     if (function) {
@@ -629,20 +620,18 @@ void til::postfix_writer::do_function_call_node(
     std::vector<std::shared_ptr<cdk::basic_type>> arg_types;
     const auto function = node->func();
     if (node->func()) {
-        // in non recursive calls, the arguments are already stored in the node
-        // itself
         arg_types =
             cdk::functional_type::cast(function->type())->input()->components();
     } else { // recursive call -> @
-        // in recursive calls, we'll want to fetch the symbol associated with
-        // the deepest function we can find, and retrieve its arguments
+        // get the arguments associated with the symbol of the function to
+        // recursively call
         auto deepest_function = _functions.back();
         arg_types = cdk::functional_type::cast(deepest_function->type())
                         ->input()
                         ->components();
     }
 
-    size_t args_size = 0; // size of all the arguments in bytes
+    size_t args_bytes = 0;
     if (node->arguments()) {
         for (int i = node->arguments()->size() - 1; i >= 0; --i) {
             auto arg = dynamic_cast<cdk::expression_node *>(
@@ -650,34 +639,32 @@ void til::postfix_writer::do_function_call_node(
             arg->accept(this, lvl + 2);
             if (arg_types[i]->name() == cdk::TYPE_DOUBLE &&
                 arg->type()->name() == cdk::TYPE_INT) {
-                args_size +=
-                    4;     // if we're passing an integer where a double is
-                           // expected, we need to allocate 4 additional bytes
-                _pf.I2D(); // also need to convert integer to double
+                // extra 4 bytes in case we pass an integer for an argument of
+                // type double
+                args_bytes += 4;
+                _pf.I2D();
             }
-            args_size += arg->type()->size();
+            args_bytes += arg->type()->size();
         }
     }
 
-    // there are 3 cases now: we may want to do a recursive, non-recursive
-    // "regular", or forwarded call
-    if (function) {
-        // non-recursive calls
-        _currentForwardLabel.clear();
-        // if we accept a forwarded function, the label will once again be set
-        function->accept(this, lvl + 2);
-        if (_currentForwardLabel.empty()) // it's a "regular" non-recursive call
-            _pf.BRANCH();
-        else // it's a forwarded call
-            _pf.CALL(_currentForwardLabel);
-    } else {
-        // recursive calls
+    // 3 cases -> non-recursive call, forwarded call or recursive call
+    if (!function) { // recursive calls
         _pf.CALL(_functionLabels.back());
+    } else { // non-recursive calls
+        _currentForwardLabel.clear();
+        function->accept(this, lvl + 2);
+        if (_currentForwardLabel
+                .empty()) { // it is a non-recursive and non-forwarded call
+            _pf.BRANCH();
+        } else { // forwarded call
+            _pf.CALL(_currentForwardLabel);
+        }
     }
 
-    if (args_size > 0) {
-        // removes no-longer-needed arguments from the stack
-        _pf.TRASH(args_size);
+    // clear the bytes held by the arguments that are no longer needed
+    if (args_bytes > 0) {
+        _pf.TRASH(args_bytes);
     }
 
     switch (node->type()->name()) {
@@ -685,16 +672,12 @@ void til::postfix_writer::do_function_call_node(
         break;
     case cdk::TYPE_INT:
         if (_currentForwardLabel.empty()) {
-            // the second part of allowing covariance to happen (with the first
-            // one being handled in the return node's visitor) there, we make
-            // every non-main int-returning function actually return a double
-            // here, we convert that double back to an int, as it is the
-            // callee's responsibility to properly cast the return values
+            // because every non-main function returns double, we need to
+            // reconvert it back to int in the cases where
             _pf.LDFVAL64();
             _pf.D2I();
         } else {
-            // note how in forwarded methods we don't need to do any conversion,
-            // as the return value is already an int
+            // forwarded methods already return int
             _pf.LDFVAL32();
         }
         break;
@@ -706,19 +689,18 @@ void til::postfix_writer::do_function_call_node(
     case cdk::TYPE_DOUBLE:
         _pf.LDFVAL64();
         break;
-    default: // can't happen!
+    default: // shouldn't happen
         error(node->lineno(), "cannot call expression of unknown type");
     }
 
-    _currentForwardLabel
-        .clear(); // we're done with this label, so we can clear it
+    _currentForwardLabel.clear();
 }
 
 void til::postfix_writer::do_return_node(til::return_node *const node,
                                          int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
-    // should not reach here without returning a value (if not void)
+    // type of current function
     const auto current_function_type_name =
         cdk::functional_type::cast(_functions.back()->type())
             ->output(0)
@@ -728,18 +710,13 @@ void til::postfix_writer::do_return_node(til::return_node *const node,
         node->retval()->accept(this, lvl + 2);
         switch (current_function_type_name) {
         case cdk::TYPE_INT:
-            // allowing covariant return types (i.e., double is considered a
-            // valid return type to cast from int) we'll always return doubles
-            // from non-main functions instead of ints, to allow covariance the
-            // second part of this logic is handled in the function call's
-            // visitor, where we _load_ the return value, which should be the
-            // address of the first instruction of the function being called
-            // !!! the exception is main, since it returns 0 (int) per
-            // convention
             if (_functions.back()->is_main()) {
+                // in the case of the main function we have to return an int
                 _mainReturnSeen = true;
                 _pf.STFVAL32();
             } else {
+                // to allow covariance, we return a double from non-main
+                // functions
                 _pf.I2D();
                 _pf.STFVAL64();
             }
@@ -747,13 +724,13 @@ void til::postfix_writer::do_return_node(til::return_node *const node,
         case cdk::TYPE_STRING:
         case cdk::TYPE_POINTER:
         case cdk::TYPE_FUNCTIONAL:
-            _pf.STFVAL32(); // removes 4 bytes from the stack
+            _pf.STFVAL32(); // remove 4 bytes from the stack
             break;
         case cdk::TYPE_DOUBLE:
             if (!node->retval()->is_typed(cdk::TYPE_DOUBLE)) {
-                _pf.I2D(); // converts int to double
+                _pf.I2D();
             }
-            _pf.STFVAL64(); // removes 8 bytes (a double) from the stack
+            _pf.STFVAL64(); // remove 8 bytes from the stack
             break;
         default:
             error(node->lineno(), "invalid return type");
