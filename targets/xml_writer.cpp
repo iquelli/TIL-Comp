@@ -145,6 +145,7 @@ void til::xml_writer::do_or_node(cdk::or_node *const node, int lvl) {
 void til::xml_writer::do_variable_node(cdk::variable_node *const node,
                                        int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
+
     os() << std::string(lvl, ' ') << "<" << node->label() << ">" << node->name()
          << "</" << node->label() << ">" << std::endl;
 }
@@ -167,20 +168,22 @@ void til::xml_writer::do_index_node(til::index_node *const node, int lvl) {
 
 void til::xml_writer::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
+
     openTag(node, lvl);
-    node->lvalue()->accept(this, lvl + 4);
+    node->lvalue()->accept(this, lvl + 2);
     closeTag(node, lvl);
 }
 
 void til::xml_writer::do_assignment_node(cdk::assignment_node *const node,
                                          int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
+
     openTag(node, lvl);
 
-    node->lvalue()->accept(this, lvl);
+    node->lvalue()->accept(this, lvl + 2);
     reset_new_symbol();
+    node->rvalue()->accept(this, lvl + 2);
 
-    node->rvalue()->accept(this, lvl + 4);
     closeTag(node, lvl);
 }
 
@@ -209,8 +212,8 @@ void til::xml_writer::do_declaration_node(til::declaration_node *const node,
 void til::xml_writer::do_function_node(til::function_node *const node,
                                        int lvl) {
     os() << std::string(lvl, ' ') << "<" << node->label() << " type='"
-         << type_name(node->type()) << "' main='" << std::noboolalpha
-         << node->main() << std::boolalpha << "'>" << std::endl;
+         << type_name(node->type()) << "' main='" << std::boolalpha
+         << node->main() << std::noboolalpha << "'>" << std::endl;
 
     if (node->arguments()) {
         openTag("arguments", lvl + 2);
@@ -273,9 +276,9 @@ void til::xml_writer::do_evaluation_node(til::evaluation_node *const node,
 void til::xml_writer::do_print_node(til::print_node *const node, int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
-    openTag(node->label() +
-                (node->newline() ? " newline=true" : " newline=false"),
-            lvl);
+    os() << std::string(lvl, ' ') << "<" << node->label() << " newline='"
+         << std::boolalpha << node->newline() << std::noboolalpha << "'>"
+         << std::endl;
     node->arguments()->accept(this, lvl + 2);
     closeTag(node, lvl);
 }
