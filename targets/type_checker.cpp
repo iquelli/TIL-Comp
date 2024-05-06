@@ -64,7 +64,7 @@ bool til::type_checker::check_compatible_types(
         }
         break;
     case cdk::TYPE_POINTER:
-        if (t2_name != cdk::TYPE_POINTER ||
+        if (t2_name != cdk::TYPE_POINTER &&
             !check_compatible_ptr_types(t1, t2)) {
             return false;
         }
@@ -127,13 +127,13 @@ void til::type_checker::throw_incompatible_types(
     switch (t1->name()) {
     case cdk::TYPE_INT:
     case cdk::TYPE_DOUBLE:
-        throw std::string("wrong type: expected double or int");
+        throw std::string("wrong type - expected double or int");
     case cdk::TYPE_STRING:
-        throw std::string("wrong type: expected string");
+        throw std::string("wrong type - expected string");
     case cdk::TYPE_POINTER:
-        throw std::string("wrong type: expected pointer");
+        throw std::string("wrong type - expected pointer");
     case cdk::TYPE_FUNCTIONAL:
-        throw std::string("wrong type: expected function");
+        throw std::string("wrong type - expected function");
     default:
         throw std::string("unknown type");
     }
