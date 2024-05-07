@@ -425,23 +425,22 @@ void til::postfix_writer::process_local_var_init(
     std::shared_ptr<til::symbol> symbol,
     cdk::expression_node *const initializer, int lvl) {
     initializer->accept(this, lvl);
-    switch (symbol->type()->name()) {
-    case cdk::TYPE_INT:
-    case cdk::TYPE_STRING:
-    case cdk::TYPE_POINTER:
-    case cdk::TYPE_FUNCTIONAL:
-    case cdk::TYPE_UNSPEC: // cases like `(var x (read))`
+
+    if (symbol->type()->name() == cdk::TYPE_INT ||
+        symbol->type()->name() == cdk::TYPE_STRING ||
+        symbol->type()->name() == cdk::TYPE_POINTER ||
+        symbol->type()->name() == cdk::TYPE_FUNCTIONAL ||
+        symbol->type()->name() == cdk::TYPE_UNSPEC) {
+        // UNSPEC is for cases like `(var x (read))`
         _pf.LOCAL(symbol->offset());
         _pf.STINT();
-        break;
-    case cdk::TYPE_DOUBLE:
+    } else if (symbol->type()->name() == cdk::TYPE_DOUBLE) {
         if (initializer->is_typed(cdk::TYPE_INT)) {
             _pf.I2D();
         }
         _pf.LOCAL(symbol->offset());
         _pf.STDOUBLE();
-        break;
-    default:
+    } else {
         error(initializer->lineno(),
               "variable initialization has invalid type");
     }
@@ -449,38 +448,32 @@ void til::postfix_writer::process_local_var_init(
 void til::postfix_writer::process_global_var_init(
     std::shared_ptr<til::symbol> symbol,
     cdk::expression_node *const initializer, int lvl) {
-    switch (symbol->type()->name()) {
-    case cdk::TYPE_INT:
-    case cdk::TYPE_STRING:
-    case cdk::TYPE_POINTER:
+    if (symbol->type()->name() == cdk::TYPE_INT ||
+        symbol->type()->name() == cdk::TYPE_STRING ||
+        symbol->type()->name() == cdk::TYPE_POINTER) {
         _pf.DATA();
         _pf.ALIGN();
         _pf.LABEL(symbol->name());
         initializer->accept(this, lvl + 2);
-        break;
-    case cdk::TYPE_DOUBLE:
+    } else if (symbol->type()->name() == cdk::TYPE_DOUBLE) {
         _pf.DATA();
         _pf.ALIGN();
         _pf.LABEL(symbol->name());
 
         const cdk::integer_node *dclini;
         cdk::double_node *ddi;
-        switch (initializer->type()->name()) {
-        case cdk::TYPE_INT:
+        if (initializer->type()->name() == cdk::TYPE_INT) {
             // essentially cast the int into a double
             dclini = dynamic_cast<const cdk::integer_node *>(initializer);
             ddi = new cdk::double_node(dclini->lineno(), dclini->value());
             ddi->accept(this, lvl + 2);
-            break;
-        case cdk::TYPE_DOUBLE:
+        } else if (initializer->type()->name() == cdk::TYPE_DOUBLE) {
             initializer->accept(this, lvl + 2);
-            break;
-        default:
+        } else {
             error(initializer->lineno(),
                   "double variable initialization has invalid type");
         }
-        break;
-    case cdk::TYPE_FUNCTIONAL:
+    } else if (symbol->type()->name() == cdk::TYPE_FUNCTIONAL) {
         _functions.push_back(symbol);
         initializer->accept(this, lvl);
         _pf.DATA();
@@ -490,8 +483,7 @@ void til::postfix_writer::process_global_var_init(
         }
         _pf.LABEL(symbol->name());
         _pf.SADDR(_functionLabels.back());
-        break;
-    default:
+    } else {
         error(initializer->lineno(),
               "variable initialization has invalid type");
     }
@@ -667,10 +659,9 @@ void til::postfix_writer::do_function_call_node(
         _pf.TRASH(args_bytes);
     }
 
-    switch (node->type()->name()) {
-    case cdk::TYPE_VOID:
-        break;
-    case cdk::TYPE_INT:
+    if (node->type()->name() == cdk::TYPE_VOID) {
+        // do nothing
+    } else if (node->type()->name() == cdk::TYPE_INT) {
         if (_currentForwardLabel.empty()) {
             // because every non-main function returns double, we need to
             // reconvert it back to int in the cases where
@@ -680,16 +671,13 @@ void til::postfix_writer::do_function_call_node(
             // forwarded methods already return int
             _pf.LDFVAL32();
         }
-        break;
-    case cdk::TYPE_STRING:
-    case cdk::TYPE_POINTER:
-    case cdk::TYPE_FUNCTIONAL:
+    } else if (node->type()->name() == cdk::TYPE_STRING ||
+               node->type()->name() == cdk::TYPE_POINTER ||
+               node->type()->name() == cdk::TYPE_FUNCTIONAL) {
         _pf.LDFVAL32();
-        break;
-    case cdk::TYPE_DOUBLE:
+    } else if (node->type()->name() == cdk::TYPE_DOUBLE) {
         _pf.LDFVAL64();
-        break;
-    default: // shouldn't happen
+    } else { // shouldn't happen
         error(node->lineno(), "cannot call expression of unknown type");
     }
 
@@ -701,15 +689,14 @@ void til::postfix_writer::do_return_node(til::return_node *const node,
     ASSERT_SAFE_EXPRESSIONS;
 
     // type of current function
-    const auto current_function_type_name =
+    const auto current_func_type_name =
         cdk::functional_type::cast(_functions.back()->type())
             ->output(0)
             ->name();
 
-    if (current_function_type_name != cdk::TYPE_VOID) {
+    if (current_func_type_name != cdk::TYPE_VOID) {
         node->retval()->accept(this, lvl + 2);
-        switch (current_function_type_name) {
-        case cdk::TYPE_INT:
+        if (current_func_type_name == cdk::TYPE_INT) {
             if (_functions.back()->is_main()) {
                 // in the case of the main function we have to return an int
                 _mainReturnSeen = true;
@@ -720,19 +707,16 @@ void til::postfix_writer::do_return_node(til::return_node *const node,
                 _pf.I2D();
                 _pf.STFVAL64();
             }
-            break;
-        case cdk::TYPE_STRING:
-        case cdk::TYPE_POINTER:
-        case cdk::TYPE_FUNCTIONAL:
+        } else if (current_func_type_name == cdk::TYPE_STRING ||
+                   current_func_type_name == cdk::TYPE_POINTER ||
+                   current_func_type_name == cdk::TYPE_FUNCTIONAL) {
             _pf.STFVAL32(); // remove 4 bytes from the stack
-            break;
-        case cdk::TYPE_DOUBLE:
+        } else if (current_func_type_name == cdk::TYPE_DOUBLE) {
             if (!node->retval()->is_typed(cdk::TYPE_DOUBLE)) {
                 _pf.I2D();
             }
             _pf.STFVAL64(); // remove 8 bytes from the stack
-            break;
-        default:
+        } else {
             error(node->lineno(), "invalid return type");
         }
     }

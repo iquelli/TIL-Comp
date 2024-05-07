@@ -51,46 +51,27 @@ bool til::type_checker::check_compatible_types(
     std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
     const auto t1_name = t1->name();
     const auto t2_name = t2->name();
-    switch (t1_name) {
-    case cdk::TYPE_INT:
-    case cdk::TYPE_DOUBLE:
-        if (t2_name != cdk::TYPE_DOUBLE && t2_name != cdk::TYPE_INT) {
-            return false;
-        }
-        break;
-    case cdk::TYPE_STRING:
-        if (t2_name != cdk::TYPE_STRING) {
-            return false;
-        }
-        break;
-    case cdk::TYPE_POINTER:
-        if (t2_name != cdk::TYPE_POINTER &&
-            !check_compatible_ptr_types(t1, t2)) {
-            return false;
-        }
-        break;
-    case cdk::TYPE_FUNCTIONAL:
-        if (!((t2_name == cdk::TYPE_FUNCTIONAL &&
-               check_compatible_functional_types(
-                   cdk::functional_type::cast(t1),
-                   cdk::functional_type::cast(t2))) ||
-              (t2_name == cdk::TYPE_POINTER &&
-               cdk::reference_type::cast(t2)->referenced() == nullptr))) {
-            return false;
-        }
-        break;
-    case cdk::TYPE_UNSPEC: // useful for var cases
-        if (t2_name == cdk::TYPE_VOID) {
-            // (var x (f)), where f calls return void, is not allowed
-            return false;
-        }
-        break;
-    default:
-        if (t1_name != t2_name) {
-            return false;
-        }
+
+    if (t1_name == cdk::TYPE_INT || t1_name == cdk::TYPE_DOUBLE) {
+        return t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT;
+    } else if (t1_name == cdk::TYPE_STRING) {
+        return t2_name == cdk::TYPE_STRING;
+    } else if (t1_name == cdk::TYPE_POINTER) {
+        return t2_name == cdk::TYPE_POINTER ||
+               check_compatible_ptr_types(t1, t2);
+    } else if (t1_name == cdk::TYPE_FUNCTIONAL) {
+        return (t2_name == cdk::TYPE_FUNCTIONAL &&
+                check_compatible_functional_types(
+                    cdk::functional_type::cast(t1),
+                    cdk::functional_type::cast(t2))) ||
+               (t2_name == cdk::TYPE_POINTER &&
+                cdk::reference_type::cast(t2)->referenced() == nullptr);
+    } else if (t1_name == cdk::TYPE_UNSPEC) { // useful for var cases
+        // (var x (f)), where f calls return void, is not allowed
+        return t2_name != cdk::TYPE_VOID;
+    } else {
+        return t1_name == t2_name;
     }
-    return true;
 }
 
 void til::type_checker::change_type_on_match(cdk::typed_node *const lvalue,
@@ -124,17 +105,15 @@ void til::type_checker::throw_incompatible_types(
         return;
     }
 
-    switch (t1->name()) {
-    case cdk::TYPE_INT:
-    case cdk::TYPE_DOUBLE:
+    if (t1->name() == cdk::TYPE_INT || t1->name() == cdk::TYPE_DOUBLE) {
         throw std::string("wrong type - expected double or int");
-    case cdk::TYPE_STRING:
+    } else if (t1->name() == cdk::TYPE_STRING) {
         throw std::string("wrong type - expected string");
-    case cdk::TYPE_POINTER:
+    } else if (t1->name() == cdk::TYPE_POINTER) {
         throw std::string("wrong type - expected pointer");
-    case cdk::TYPE_FUNCTIONAL:
+    } else if (t1->name() == cdk::TYPE_FUNCTIONAL) {
         throw std::string("wrong type - expected function");
-    default:
+    } else {
         throw std::string("unknown type");
     }
 }
