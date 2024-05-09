@@ -123,11 +123,12 @@
   /* ====[                    3.8.1 - INTEGERS                        ]==== */
   /* ====================================================================== */
 
-"0x"                     yy_push_state(X_HEX_INT);
-<X_HEX_INT>[[:xdigit:]]+ yy_pop_state(); SAFE_STOI(16);
-<X_HEX_INT>.|\n          yyerror("Invalid hexadecimal number");
+"0x"                                                yy_push_state(X_HEX_INT);
+<X_HEX_INT>[[:xdigit:]]+                            yy_pop_state(); SAFE_STOI(16);
+<X_HEX_INT>[[:xdigit:]]*[G-Zg-z]+[[:xdigit:]]*|.|\n yyerror("Invalid hexadecimal number");
 
-0|[1-9][0-9]*            SAFE_STOI(10);
+0|[1-9][0-9]* SAFE_STOI(10);
+0[0-9]+       yyerror("Invalid decimal number");
 
   /* ====================================================================== */
   /* ====[                    3.8.2 - FLOATING POINT NUMBERS          ]==== */

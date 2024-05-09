@@ -118,10 +118,10 @@ return_type : type       { $$ = $1; }
 program : '(' tPROGRAM decls_instrs ')' { $$ = new til::function_node(LINE, $3); }
         ;
 
-decls_instrs : /* empty */     { $$ = new til::block_node(LINE, new cdk::sequence_node(LINE), new cdk::sequence_node(LINE)); }
-             | decls           { $$ = new til::block_node(LINE, $1, new cdk::sequence_node(LINE)); }
-             | decls instrs    { $$ = new til::block_node(LINE, $1, $2); }
-             |       instrs    { $$ = new til::block_node(LINE, new cdk::sequence_node(LINE), $1); }
+decls_instrs : /* empty */  { $$ = new til::block_node(LINE, new cdk::sequence_node(LINE), new cdk::sequence_node(LINE)); }
+             | decls        { $$ = new til::block_node(LINE, $1, new cdk::sequence_node(LINE)); }
+             | decls instrs { $$ = new til::block_node(LINE, $1, $2); }
+             |       instrs { $$ = new til::block_node(LINE, new cdk::sequence_node(LINE), $1); }
              ;
 
 decls :       decl { $$ = new cdk::sequence_node(LINE, $1); }
