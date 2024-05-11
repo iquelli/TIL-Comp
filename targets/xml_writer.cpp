@@ -251,11 +251,11 @@ void til::xml_writer::do_function_call_node(til::function_call_node *const node,
 void til::xml_writer::do_return_node(til::return_node *const node, int lvl) {
     openTag(node, lvl);
 
-    openTag("retval", lvl + 2);
     if (node->retval()) {
+        openTag("retval", lvl + 2);
         node->retval()->accept(this, lvl + 4);
+        closeTag("retval", lvl + 2);
     }
-    closeTag("retval", lvl + 2);
 
     closeTag(node, lvl);
 }

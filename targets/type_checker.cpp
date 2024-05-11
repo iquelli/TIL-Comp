@@ -39,7 +39,7 @@ bool til::type_checker::check_compatible_functional_types(
     }
 
     // the types of the arguments must be compatible
-    for (size_t i = 0; i < t1->input_length(); i++) {
+    for (size_t i = 0; i < t1->input_length(); ++i) {
         if (!check_compatible_types(t1->input(i), t2->input(i))) {
             return false;
         }
@@ -199,7 +199,6 @@ void til::type_checker::do_not_node(cdk::not_node *const node, int lvl) {
 
 bool til::type_checker::process_binary_expr(
     cdk::binary_operation_node *const node, int lvl) {
-
     node->left()->accept(this, lvl + 2);
     node->right()->accept(this, lvl + 2);
 
@@ -245,6 +244,7 @@ void til::type_checker::process_additive_expr(
         return;
     }
 
+    // TODO: fix read being unspec here
     if (node->left()->is_typed(cdk::TYPE_POINTER) &&
         node->right()->is_typed(cdk::TYPE_INT)) {
         node->type(node->left()->type());
@@ -288,6 +288,7 @@ void til::type_checker::do_div_node(cdk::div_node *const node, int lvl) {
 void til::type_checker::do_mod_node(cdk::mod_node *const node, int lvl) {
     ASSERT_UNSPEC;
 
+    // TODO: fix read being unspec here
     node->left()->accept(this, lvl + 2);
     node->right()->accept(this, lvl + 2);
     if (!node->left()->is_typed(cdk::TYPE_INT) ||
@@ -356,6 +357,7 @@ void til::type_checker::process_logical_expr(
     cdk::binary_operation_node *const node, int lvl) {
     ASSERT_UNSPEC;
 
+    // TODO: fix read being unspec here
     node->left()->accept(this, lvl + 2);
     if (!node->left()->is_typed(cdk::TYPE_INT)) {
         throw std::string(
@@ -389,7 +391,7 @@ void til::type_checker::do_variable_node(cdk::variable_node *const node,
     if (symbol != nullptr) {
         node->type(symbol->type());
     } else {
-        throw id;
+        throw std::string("undeclared variable '" + id + "'");
     }
 }
 
@@ -402,24 +404,21 @@ void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
     }
 
     node->index()->accept(this, lvl + 2);
-    if (!node->index()->is_typed(cdk::TYPE_INT)) {
+    if (node->index()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->index()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->index()->is_typed(cdk::TYPE_INT)) {
         throw std::string("wrong type in index of index expression");
     }
 
     const auto ptr_ref =
         cdk::reference_type::cast(node->ptr()->type())->referenced();
-
     node->type(ptr_ref);
 }
 
 void til::type_checker::do_rvalue_node(cdk::rvalue_node *const node, int lvl) {
     ASSERT_UNSPEC;
-    try {
-        node->lvalue()->accept(this, lvl);
-        node->type(node->lvalue()->type());
-    } catch (const std::string &id) {
-        throw "undeclared variable '" + id + "'";
-    }
+    node->lvalue()->accept(this, lvl);
+    node->type(node->lvalue()->type());
 }
 
 void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
@@ -429,6 +428,7 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
     node->lvalue()->accept(this, lvl + 2);
     node->rvalue()->accept(this, lvl + 2);
 
+    // TODO: fix read being unspec here
     change_type_on_match(node->lvalue(), node->rvalue());
     const auto lval_type = node->lvalue()->type();
     const auto rval_type = node->rvalue()->type();
@@ -441,6 +441,7 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
 
 void til::type_checker::do_declaration_node(til::declaration_node *const node,
                                             int lvl) {
+    // TODO: fix read being unspec here
     const auto &init = node->initializer();
     if (init) {
         init->accept(this, lvl + 2);
@@ -508,7 +509,8 @@ void til::type_checker::do_function_call_node(
         }
         node->arguments()->accept(this, lvl + 2);
 
-        for (size_t i = 0; i < args_types.size(); i++) {
+        for (size_t i = 0; i < args_types.size(); ++i) {
+            // TODO: fix read being unspec here
             const auto &param_type =
                 dynamic_cast<cdk::expression_node *>(node->arguments()->node(i))
                     ->type();
@@ -556,6 +558,7 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
         throw std::string("unknown return type in function");
     }
 
+    // TODO: fix read being unspec here
     ret_val->accept(this, lvl + 2);
     throw_incompatible_types(function_output, ret_val->type());
 }
@@ -565,11 +568,15 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 void til::type_checker::do_evaluation_node(til::evaluation_node *const node,
                                            int lvl) {
     node->argument()->accept(this, lvl + 2);
+    if (node->argument()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->argument()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    }
 }
 
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_print_node(til::print_node *const node, int lvl) {
+    // TODO: fix read being unspec here
     node->arguments()->accept(this, lvl + 2);
     for (auto *node : node->arguments()->nodes()) {
         const auto &type = (dynamic_cast<cdk::expression_node *>(node))->type();
@@ -590,12 +597,24 @@ void til::type_checker::do_read_node(til::read_node *const node, int lvl) {
 
 void til::type_checker::do_if_node(til::if_node *const node, int lvl) {
     node->condition()->accept(this, lvl + 4);
+    if (node->condition()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->condition()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->condition()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("wrong type in condition of if instruction");
+    }
+
     node->block()->accept(this, lvl + 4);
 }
 
 void til::type_checker::do_if_else_node(til::if_else_node *const node,
                                         int lvl) {
     node->condition()->accept(this, lvl + 4);
+    if (node->condition()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->condition()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->condition()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("wrong type in condition of if else instruction");
+    }
+
     node->thenblock()->accept(this, lvl + 4);
     node->elseblock()->accept(this, lvl + 4);
 }
@@ -604,6 +623,11 @@ void til::type_checker::do_if_else_node(til::if_else_node *const node,
 
 void til::type_checker::do_loop_node(til::loop_node *const node, int lvl) {
     node->condition()->accept(this, lvl + 4);
+    if (node->condition()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->condition()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->condition()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("wrong type in condition of loop instruction");
+    }
 }
 
 void til::type_checker::do_next_node(til::next_node *const node, int lvl) {
@@ -631,7 +655,9 @@ void til::type_checker::do_alloc_node(til::alloc_node *const node, int lvl) {
     ASSERT_UNSPEC;
 
     node->argument()->accept(this, lvl + 2);
-    if (!node->argument()->is_typed(cdk::TYPE_INT)) {
+    if (node->argument()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->argument()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->argument()->is_typed(cdk::TYPE_INT)) {
         throw std::string("wrong type in argument of alloc expression");
     }
 
