@@ -157,8 +157,12 @@
 <X_BACKSLASH>r               yy_pop_state(); *yylval.s += '\r';
 <X_BACKSLASH>t               yy_pop_state(); *yylval.s += '\t';
 <X_BACKSLASH>0{1,3}          yy_pop_state(); yy_push_state(X_STRING_IGN);
-<X_BACKSLASH>[0-3][0-7]{0,2} yy_pop_state(); *yylval.s += strtoul(yytext, NULL, 8); /* max is 255 */
-<X_BACKSLASH>[4-7][0-7]{2}   yyerror("Special character overflow");
+<X_BACKSLASH>[0-7]{1,3}      {
+                               int i = std::stoi(yytext, NULL, 8);
+                               if (i > 255) yyerror("Special character overflow"); /* max is 255 */
+                               *yylval.s += (char) i;
+                               yy_pop_state();
+                             }
 <X_BACKSLASH>.               yy_pop_state(); *yylval.s += yytext;
 
   /* ====================================================================== */
