@@ -25,7 +25,7 @@ void til::frame_size_calculator::do_sequence_node(
         if (child == nullptr) {
             break;
         }
-        child->accept(this, lvl + 2);
+        child->accept(this, lvl);
     }
 }
 
@@ -33,10 +33,10 @@ void til::frame_size_calculator::do_block_node(til::block_node *const node,
                                                int lvl) {
     _symtab.push();
     if (node->declarations()) {
-        node->declarations()->accept(this, lvl + 2);
+        node->declarations()->accept(this, lvl);
     }
     if (node->instructions()) {
-        node->instructions()->accept(this, lvl + 2);
+        node->instructions()->accept(this, lvl);
     }
     _symtab.pop();
 }
@@ -160,7 +160,7 @@ void til::frame_size_calculator::do_declaration_node(
 
 void til::frame_size_calculator::do_function_node(
     til::function_node *const node, int lvl) {
-    node->block()->accept(this, lvl + 2);
+    node->block()->accept(this, lvl);
 }
 
 void til::frame_size_calculator::do_function_call_node(
@@ -195,14 +195,14 @@ void til::frame_size_calculator::do_read_node(til::read_node *const node,
 //---------------------------------------------------------------------------
 
 void til::frame_size_calculator::do_if_node(til::if_node *const node, int lvl) {
-    node->block()->accept(this, lvl + 2);
+    node->block()->accept(this, lvl);
 }
 
 void til::frame_size_calculator::do_if_else_node(til::if_else_node *const node,
                                                  int lvl) {
-    node->thenblock()->accept(this, lvl + 2);
+    node->thenblock()->accept(this, lvl);
     if (node->elseblock()) {
-        node->elseblock()->accept(this, lvl + 2);
+        node->elseblock()->accept(this, lvl);
     }
 }
 
@@ -210,7 +210,7 @@ void til::frame_size_calculator::do_if_else_node(til::if_else_node *const node,
 
 void til::frame_size_calculator::do_loop_node(til::loop_node *const node,
                                               int lvl) {
-    node->block()->accept(this, lvl + 2);
+    node->block()->accept(this, lvl);
 }
 
 void til::frame_size_calculator::do_next_node(til::next_node *const node,
