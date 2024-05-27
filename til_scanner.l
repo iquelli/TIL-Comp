@@ -124,6 +124,7 @@
   /* ====================================================================== */
 
 "0x"                                                yy_push_state(X_HEX_INT);
+<X_HEX_INT>0+                                       yyerror("Invalid hexadecimal number");
 <X_HEX_INT>[[:xdigit:]]+                            yy_pop_state(); SAFE_STOI(16);
 <X_HEX_INT>[[:xdigit:]]*[G-Zg-z]+[[:xdigit:]]*|.|\n yyerror("Invalid hexadecimal number");
 
