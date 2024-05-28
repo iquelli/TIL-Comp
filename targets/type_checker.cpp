@@ -21,7 +21,7 @@ bool til::type_checker::check_compatible_ptr_types(
         t2_ptr = cdk::reference_type::cast(t2_ptr)->referenced();
     }
     return t1_ptr->name() == t2_ptr->name() ||
-           t2_ptr->name() == cdk::TYPE_UNSPEC;
+           t2_ptr->name() == cdk::TYPE_UNSPEC; // e.g. (objects n) is unspec
 }
 
 bool til::type_checker::check_compatible_functional_types(
@@ -58,7 +58,7 @@ bool til::type_checker::check_compatible_types(
         return t2_name == cdk::TYPE_STRING;
     } else if (t1_name == cdk::TYPE_POINTER) {
         return t2_name == cdk::TYPE_POINTER ||
-               check_compatible_ptr_types(t1, t2);
+               t2_name == cdk::TYPE_UNSPEC; // e.g. (objects n) is unspec
     } else if (t1_name == cdk::TYPE_FUNCTIONAL) {
         return (t2_name == cdk::TYPE_FUNCTIONAL &&
                 check_compatible_functional_types(
