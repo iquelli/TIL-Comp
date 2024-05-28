@@ -27,15 +27,17 @@ bool til::type_checker::check_compatible_ptr_types(
 bool til::type_checker::check_compatible_functional_types(
     std::shared_ptr<cdk::functional_type> t1,
     std::shared_ptr<cdk::functional_type> t2) {
-    // the return type must be compatible
-    if ((t1->output_length() > 0 && t2->output_length() > 0) &&
-        !check_compatible_types(t1->output(0), t2->output(0))) {
+    // the number of arguments and outputs must be the same
+    if (t1->input_length() != t2->input_length() ||
+        t1->output_length() != t2->output_length()) {
         return false;
     }
 
-    // the number of arguments must be the same
-    if (t1->input_length() != t2->input_length()) {
-        return false;
+    // the return type must be compatible
+    for (size_t i = 0; i < t1->output_length(); ++i) {
+        if (!check_compatible_types(t1->output(i), t2->output(i))) {
+            return false;
+        }
     }
 
     // the types of the arguments must be compatible
@@ -57,14 +59,16 @@ bool til::type_checker::check_compatible_types(
     } else if (t1_name == cdk::TYPE_STRING) {
         return t2_name == cdk::TYPE_STRING;
     } else if (t1_name == cdk::TYPE_POINTER) {
-        return t2_name == cdk::TYPE_POINTER ||
-               t2_name == cdk::TYPE_UNSPEC; // e.g. (objects n) is unspec
+        return t2_name == cdk::TYPE_POINTER &&
+               (check_compatible_ptr_types(t1, t2) ||
+                cdk::reference_type::cast(t2)->referenced()->name() ==
+                    cdk::TYPE_VOID);
     } else if (t1_name == cdk::TYPE_FUNCTIONAL) {
         return t2_name == cdk::TYPE_FUNCTIONAL &&
                check_compatible_functional_types(
                    cdk::functional_type::cast(t1),
                    cdk::functional_type::cast(t2));
-    } else if (t1_name == cdk::TYPE_UNSPEC) { // useful for var cases
+    } else if (t1_name == cdk::TYPE_UNSPEC) {
         // (var x (f)), where f calls return void, is not allowed
         return t2_name != cdk::TYPE_VOID;
     } else {
@@ -388,11 +392,10 @@ void til::type_checker::do_variable_node(cdk::variable_node *const node,
     const std::string &id = node->name();
     std::shared_ptr<til::symbol> symbol = _symtab.find(id);
 
-    if (symbol != nullptr) {
-        node->type(symbol->type());
-    } else {
+    if (symbol == nullptr) {
         throw std::string("undeclared variable '" + id + "'");
     }
+    node->type(symbol->type());
 }
 
 void til::type_checker::do_index_node(til::index_node *const node, int lvl) {
