@@ -101,25 +101,6 @@ void til::type_checker::change_type_on_match(cdk::typed_node *const lvalue,
     }
 }
 
-void til::type_checker::throw_incompatible_types(
-    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
-    if (check_compatible_types(t1, t2)) {
-        return;
-    }
-
-    if (t1->name() == cdk::TYPE_INT || t1->name() == cdk::TYPE_DOUBLE) {
-        throw std::string("wrong type - expected double or int");
-    } else if (t1->name() == cdk::TYPE_STRING) {
-        throw std::string("wrong type - expected string");
-    } else if (t1->name() == cdk::TYPE_POINTER) {
-        throw std::string("wrong type - expected pointer");
-    } else if (t1->name() == cdk::TYPE_FUNCTIONAL) {
-        throw std::string("wrong type - expected function");
-    } else {
-        throw std::string("unknown type");
-    }
-}
-
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_nil_node(cdk::nil_node *const node, int lvl) {
@@ -435,7 +416,9 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
     const auto lval_type = node->lvalue()->type();
     const auto rval_type = node->rvalue()->type();
 
-    throw_incompatible_types(lval_type, rval_type);
+    if (!check_compatible_types(lval_type, rval_type)) {
+        throw std::string("wrong types in assignment expression");
+    }
     node->type(lval_type);
 }
 
@@ -448,7 +431,9 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
         init->accept(this, lvl);
         if (node->type()) {
             change_type_on_match(node, init);
-            throw_incompatible_types(node->type(), init->type());
+            if (!check_compatible_types(node->type(), init->type())) {
+                throw std::string("wrong type on right side of declaration");
+            }
             if (node->type()->name() == cdk::TYPE_UNSPEC) {
                 node->type(init->type());
             }
@@ -572,7 +557,9 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
          function_output->name() == cdk::TYPE_DOUBLE)) {
         ret_val->type(function_output);
     }
-    throw_incompatible_types(function_output, ret_val->type());
+    if (!check_compatible_types(function_output, ret_val->type())) {
+        throw std::string("wrong type in return value of return expression");
+    }
 }
 
 //---------------------------------------------------------------------------

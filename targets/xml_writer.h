@@ -58,7 +58,7 @@ class xml_writer : public basic_ast_visitor {
         };
     }
     inline std::string type_name(std::shared_ptr<cdk::basic_type> type) {
-        if (type == nullptr) { // TODO: remove this if after type_checker
+        if (type == nullptr) {
             return "unknown";
         }
         if (type->name() == cdk::TYPE_VOID) {

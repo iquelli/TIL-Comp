@@ -33,8 +33,6 @@ class type_checker : public basic_ast_visitor {
                                 std::shared_ptr<cdk::basic_type> t2);
     void change_type_on_match(cdk::typed_node *const lvalue,
                               cdk::typed_node *const rvalue);
-    void throw_incompatible_types(std::shared_ptr<cdk::basic_type> t1,
-                                  std::shared_ptr<cdk::basic_type> t2);
 
     void process_unary_expr(cdk::unary_operation_node *const node, int lvl,
                             bool accept_doubles);
