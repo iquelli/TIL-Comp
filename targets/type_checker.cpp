@@ -60,12 +60,10 @@ bool til::type_checker::check_compatible_types(
         return t2_name == cdk::TYPE_POINTER ||
                t2_name == cdk::TYPE_UNSPEC; // e.g. (objects n) is unspec
     } else if (t1_name == cdk::TYPE_FUNCTIONAL) {
-        return (t2_name == cdk::TYPE_FUNCTIONAL &&
-                check_compatible_functional_types(
-                    cdk::functional_type::cast(t1),
-                    cdk::functional_type::cast(t2))) ||
-               (t2_name == cdk::TYPE_POINTER &&
-                cdk::reference_type::cast(t2)->referenced() == nullptr);
+        return t2_name == cdk::TYPE_FUNCTIONAL &&
+               check_compatible_functional_types(
+                   cdk::functional_type::cast(t1),
+                   cdk::functional_type::cast(t2));
     } else if (t1_name == cdk::TYPE_UNSPEC) { // useful for var cases
         // (var x (f)), where f calls return void, is not allowed
         return t2_name != cdk::TYPE_VOID;
