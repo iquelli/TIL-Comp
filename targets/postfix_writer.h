@@ -57,10 +57,11 @@ class postfix_writer : public basic_ast_visitor {
     /** Method used to generate sequential labels. */
     inline std::string mklbl(int lbl) {
         std::ostringstream oss;
-        if (lbl < 0)
+        if (lbl < 0) {
             oss << ".L" << -lbl;
-        else
+        } else {
             oss << "_L" << lbl;
+        }
         return oss.str();
     }
 

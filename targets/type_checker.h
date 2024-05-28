@@ -37,16 +37,17 @@ class type_checker : public basic_ast_visitor {
                                   std::shared_ptr<cdk::basic_type> t2);
 
     void process_unary_expr(cdk::unary_operation_node *const node, int lvl,
-                            bool acceptDouble);
+                            bool accept_doubles);
     bool process_binary_expr(cdk::binary_operation_node *const node, int lvl);
+    bool process_binary_integer_expr(cdk::binary_operation_node *const node,
+                                     int lvl);
     void process_additive_expr(cdk::binary_operation_node *const node, int lvl,
-                               bool isSubtraction);
+                               bool is_subtraction);
     void process_multiplicative_expr(cdk::binary_operation_node *const node,
                                      int lvl);
     void process_comparison_expr(cdk::binary_operation_node *const node,
                                  int lvl);
     void process_equality_expr(cdk::binary_operation_node *const node, int lvl);
-    void process_logical_expr(cdk::binary_operation_node *const node, int lvl);
     template <typename T>
     void process_literal(cdk::literal_node<T> *const node, int lvl) {}
 

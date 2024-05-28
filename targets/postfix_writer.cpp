@@ -36,7 +36,7 @@ void til::postfix_writer::do_block_node(til::block_node *const node, int lvl) {
     _lastBlockInstrSeen = false;
     for (size_t i = 0; i < node->instructions()->size(); ++i) {
         if (_lastBlockInstrSeen) {
-            error(node->lineno(), "unreachable code");
+            error(node->lineno(), "unreachable code after final instruction");
             return;
         }
         node->instructions()->node(i)->accept(this, lvl);
@@ -88,8 +88,6 @@ void til::postfix_writer::do_string_node(cdk::string_node *const node,
 }
 
 void til::postfix_writer::do_null_node(til::null_node *const node, int lvl) {
-    ASSERT_SAFE_EXPRESSIONS;
-
     // 0 in the stack for null
     if (_inFunctionBody) {
         _pf.INT(0);
@@ -104,8 +102,12 @@ void til::postfix_writer::do_unary_minus_node(cdk::unary_minus_node *const node,
                                               int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
-    node->argument()->accept(this, lvl); // determine the value
-    _pf.NEG();                           // 2-complement
+    node->argument()->accept(this, lvl);    // determine the value
+    if (node->is_typed(cdk::TYPE_DOUBLE)) { // 2-complement
+        _pf.DNEG();
+    } else {
+        _pf.NEG();
+    }
 }
 
 void til::postfix_writer::do_unary_plus_node(cdk::unary_plus_node *const node,
@@ -121,8 +123,7 @@ void til::postfix_writer::do_not_node(cdk::not_node *const node, int lvl) {
     // compare the value of the node with false
     node->argument()->accept(this, lvl);
     _pf.INT(0);
-    // check if the two values on the stack are the same
-    _pf.EQ();
+    _pf.EQ(); // check if the two values on the stack are the same
 }
 
 //---------------------------------------------------------------------------
@@ -135,26 +136,24 @@ void til::postfix_writer::process_additive_expr(
 
     node->left()->accept(this, lvl);
     if (node->is_typed(cdk::TYPE_DOUBLE) &&
-        !node->left()->is_typed(cdk::TYPE_DOUBLE)) {
+        node->left()->is_typed(cdk::TYPE_INT)) {
         _pf.I2D();
     } else if (node->is_typed(cdk::TYPE_POINTER) &&
                !node->left()->is_typed(cdk::TYPE_POINTER)) {
         const auto ref_right =
             cdk::reference_type::cast(node->right()->type())->referenced();
-        // void size should be 1 for pointer arithmetic
         _pf.INT(std::max(1, static_cast<int>(ref_right->size())));
         _pf.MUL();
     }
 
     node->right()->accept(this, lvl);
     if (node->is_typed(cdk::TYPE_DOUBLE) &&
-        !node->right()->is_typed(cdk::TYPE_DOUBLE)) {
+        node->right()->is_typed(cdk::TYPE_INT)) {
         _pf.I2D();
     } else if (node->is_typed(cdk::TYPE_POINTER) &&
                !node->right()->is_typed(cdk::TYPE_POINTER)) {
         const auto ref_left =
             cdk::reference_type::cast(node->left()->type())->referenced();
-        // void size should be 1 for pointer arithmetic
         _pf.INT(std::max(1, static_cast<int>(ref_left->size())));
         _pf.MUL();
     }
@@ -172,21 +171,18 @@ void til::postfix_writer::do_add_node(cdk::add_node *const node, int lvl) {
 void til::postfix_writer::do_sub_node(cdk::sub_node *const node, int lvl) {
     process_additive_expr(node, lvl);
 
-    if (node->is_typed(cdk::TYPE_DOUBLE)) {
+    if (!node->is_typed(cdk::TYPE_DOUBLE)) {
+        _pf.SUB();
+    } else {
         _pf.DSUB();
-        return;
     }
 
-    _pf.SUB();
-
-    // if it's a pointer we need to a special case
+    // if both are pointers we need a special case
     if (node->left()->is_typed(cdk::TYPE_POINTER) &&
-        node->right()->is_typed(cdk::TYPE_POINTER) &&
-        cdk::reference_type::cast(node->left()->type())->referenced()->name() !=
-            cdk::TYPE_VOID) {
-        _pf.INT(cdk::reference_type::cast(node->left()->type())
-                    ->referenced()
-                    ->size());
+        node->right()->is_typed(cdk::TYPE_POINTER)) {
+        const auto ref_left =
+            cdk::reference_type::cast(node->left()->type())->referenced();
+        _pf.INT(std::max(1, static_cast<int>(ref_left->size())));
         _pf.DIV();
     }
 }
@@ -199,13 +195,13 @@ void til::postfix_writer::process_multiplicative_expr(
 
     node->left()->accept(this, lvl);
     if (node->is_typed(cdk::TYPE_DOUBLE) &&
-        !node->left()->is_typed(cdk::TYPE_DOUBLE)) {
+        node->left()->is_typed(cdk::TYPE_INT)) {
         _pf.I2D();
     }
 
     node->right()->accept(this, lvl);
     if (node->is_typed(cdk::TYPE_DOUBLE) &&
-        !node->right()->is_typed(cdk::TYPE_DOUBLE)) {
+        node->right()->is_typed(cdk::TYPE_INT)) {
         _pf.I2D();
     }
 }
@@ -243,14 +239,14 @@ void til::postfix_writer::process_comparison_expr(
     ASSERT_SAFE_EXPRESSIONS;
 
     node->left()->accept(this, lvl);
-    if (!node->left()->is_typed(cdk::TYPE_DOUBLE) &&
-        node->right()->is_typed(cdk::TYPE_DOUBLE)) {
+    if (node->is_typed(cdk::TYPE_DOUBLE) &&
+        node->left()->is_typed(cdk::TYPE_INT)) {
         _pf.I2D();
     }
 
     node->right()->accept(this, lvl);
-    if (!node->right()->is_typed(cdk::TYPE_DOUBLE) &&
-        node->left()->is_typed(cdk::TYPE_DOUBLE)) {
+    if (node->is_typed(cdk::TYPE_DOUBLE) &&
+        node->right()->is_typed(cdk::TYPE_INT)) {
         _pf.I2D();
     }
 
@@ -295,7 +291,7 @@ void til::postfix_writer::do_and_node(cdk::and_node *const node, int lvl) {
 
     node->left()->accept(this, lvl);
     _pf.DUP32();
-    _pf.JZ(lbl);
+    _pf.JZ(lbl); // and short-circuit
 
     node->right()->accept(this, lvl);
     _pf.AND();
@@ -309,7 +305,7 @@ void til::postfix_writer::do_or_node(cdk::or_node *const node, int lvl) {
 
     node->left()->accept(this, lvl);
     _pf.DUP32();
-    _pf.JNZ(lbl);
+    _pf.JNZ(lbl); // or short-circuit
 
     node->right()->accept(this, lvl);
     _pf.OR();
