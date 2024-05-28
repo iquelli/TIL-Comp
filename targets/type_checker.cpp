@@ -431,7 +431,6 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
     node->lvalue()->accept(this, lvl);
     node->rvalue()->accept(this, lvl);
 
-    // TODO: fix read being unspec here
     change_type_on_match(node->lvalue(), node->rvalue());
     const auto lval_type = node->lvalue()->type();
     const auto rval_type = node->rvalue()->type();
@@ -444,7 +443,6 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
 
 void til::type_checker::do_declaration_node(til::declaration_node *const node,
                                             int lvl) {
-    // TODO: fix read being unspec here
     const auto &init = node->initializer();
     if (init) {
         init->accept(this, lvl);
@@ -513,15 +511,22 @@ void til::type_checker::do_function_call_node(
         node->arguments()->accept(this, lvl);
 
         for (size_t i = 0; i < args_types.size(); ++i) {
-            // TODO: fix read being unspec here
-            const auto &param_type =
-                dynamic_cast<cdk::expression_node *>(node->arguments()->node(i))
-                    ->type();
+            const auto &arg = dynamic_cast<cdk::expression_node *>(
+                node->arguments()->node(i));
+            if (arg->type()->name() == cdk::TYPE_UNSPEC &&
+                args_types[i]->name() == cdk::TYPE_INT) {
+                arg->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+                continue;
+            } else if (arg->type()->name() == cdk::TYPE_UNSPEC &&
+                       args_types[i]->name() == cdk::TYPE_DOUBLE) {
+                arg->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
+                continue;
+            }
             // note that the second condition is to allow passing an int as a
             // double
-            if ((args_types[i] == param_type) ||
+            if ((args_types[i] == arg->type()) ||
                 (args_types[i]->name() == cdk::TYPE_DOUBLE &&
-                 param_type->name() == cdk::TYPE_INT)) {
+                 arg->type()->name() == cdk::TYPE_INT)) {
                 continue;
             }
             throw std::string(
@@ -561,8 +566,12 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
         throw std::string("unknown return type in function");
     }
 
-    // TODO: fix read being unspec here
     ret_val->accept(this, lvl);
+    if (ret_val->is_typed(cdk::TYPE_UNSPEC) &&
+        (function_output->name() == cdk::TYPE_INT ||
+         function_output->name() == cdk::TYPE_DOUBLE)) {
+        ret_val->type(function_output);
+    }
     throw_incompatible_types(function_output, ret_val->type());
 }
 
@@ -579,13 +588,17 @@ void til::type_checker::do_evaluation_node(til::evaluation_node *const node,
 //---------------------------------------------------------------------------
 
 void til::type_checker::do_print_node(til::print_node *const node, int lvl) {
-    // TODO: fix read being unspec here
-    node->arguments()->accept(this, lvl);
-    for (auto *node : node->arguments()->nodes()) {
-        const auto &type = (dynamic_cast<cdk::expression_node *>(node))->type();
-        if (type->name() != cdk::TYPE_INT && type->name() != cdk::TYPE_DOUBLE &&
-            type->name() != cdk::TYPE_STRING) {
-            throw std::string("wrong type in argument of print expression");
+    for (size_t i = 0; i < node->arguments()->size(); ++i) {
+        auto child =
+            dynamic_cast<cdk::expression_node *>(node->arguments()->node(i));
+        child->accept(this, lvl);
+        if (child->is_typed(cdk::TYPE_UNSPEC)) {
+            child->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+        } else if (!child->is_typed(cdk::TYPE_INT) &&
+                   !child->is_typed(cdk::TYPE_DOUBLE) &&
+                   !child->is_typed(cdk::TYPE_STRING)) {
+            throw std::string("wrong type for argument number " +
+                              std::to_string(i + 1) + " of print instruction");
         }
     }
 }
