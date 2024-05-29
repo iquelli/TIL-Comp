@@ -11,46 +11,35 @@
             return;                                                            \
     }
 
-bool til::type_checker::check_compatible_ptr_types(
-    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
-    auto t1_ptr = t1;
-    auto t2_ptr = t2;
-    while (t1_ptr->name() == cdk::TYPE_POINTER &&
-           t2_ptr->name() == cdk::TYPE_POINTER) {
-        t1_ptr = cdk::reference_type::cast(t1_ptr)->referenced();
-        t2_ptr = cdk::reference_type::cast(t2_ptr)->referenced();
-    }
-    return t1_ptr->name() == t2_ptr->name() ||
-           t2_ptr->name() == cdk::TYPE_UNSPEC; // e.g. (objects n) is unspec
-}
-
 bool til::type_checker::check_compatible_functional_types(
     std::shared_ptr<cdk::functional_type> t1,
-    std::shared_ptr<cdk::functional_type> t2) {
-    // the number of arguments and outputs must be the same
+    std::shared_ptr<cdk::functional_type> t2, bool cov) {
+    // The number of arguments and outputs must be the same
     if (t1->input_length() != t2->input_length() ||
         t1->output_length() != t2->output_length()) {
         return false;
     }
 
-    // the return type must be compatible
+    // The return type must be compatible
     for (size_t i = 0; i < t1->output_length(); ++i) {
-        if (!check_compatible_types(t1->output(i), t2->output(i))) {
+        if (!check_compatible_types(t1->output(i), t2->output(i), cov)) {
             return false;
         }
     }
 
-    // the types of the arguments must be compatible
+    // The types of the arguments must be compatible
     for (size_t i = 0; i < t1->input_length(); ++i) {
-        if (!check_compatible_types(t1->input(i), t2->input(i))) {
+        if (!check_compatible_types(t1->input(i), t2->input(i), cov)) {
             return false;
         }
     }
+
     return true;
 }
 
 bool til::type_checker::check_compatible_types(
-    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2) {
+    std::shared_ptr<cdk::basic_type> t1, std::shared_ptr<cdk::basic_type> t2,
+    bool cov) {
     const auto t1_name = t1->name();
     const auto t2_name = t2->name();
 
@@ -60,14 +49,16 @@ bool til::type_checker::check_compatible_types(
         return t2_name == cdk::TYPE_STRING;
     } else if (t1_name == cdk::TYPE_POINTER) {
         return t2_name == cdk::TYPE_POINTER &&
-               (check_compatible_ptr_types(t1, t2) ||
+               (check_compatible_types(
+                    cdk::reference_type::cast(t1)->referenced(),
+                    cdk::reference_type::cast(t2)->referenced(), false) ||
                 cdk::reference_type::cast(t2)->referenced()->name() ==
-                    cdk::TYPE_VOID);
+                    cdk::TYPE_UNSPEC);
     } else if (t1_name == cdk::TYPE_FUNCTIONAL) {
         return t2_name == cdk::TYPE_FUNCTIONAL &&
-               check_compatible_functional_types(
-                   cdk::functional_type::cast(t1),
-                   cdk::functional_type::cast(t2));
+               check_compatible_functional_types(cdk::functional_type::cast(t1),
+                                                 cdk::functional_type::cast(t2),
+                                                 cov);
     } else if (t1_name == cdk::TYPE_UNSPEC) {
         // (var x (f)), where f calls return void, is not allowed
         return t2_name != cdk::TYPE_VOID;
@@ -88,12 +79,12 @@ void til::type_checker::change_type_on_match(cdk::typed_node *const lvalue,
         rvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     } else if ((lval_type->name() == cdk::TYPE_POINTER &&
                 rval_type->name() == cdk::TYPE_POINTER &&
-                check_compatible_ptr_types(lval_type, rval_type)) ||
+                check_compatible_types(lval_type, rval_type, false)) ||
                (lval_type->name() == cdk::TYPE_FUNCTIONAL &&
                 rval_type->name() == cdk::TYPE_FUNCTIONAL &&
                 check_compatible_functional_types(
                     cdk::functional_type::cast(lval_type),
-                    cdk::functional_type::cast(rval_type))) ||
+                    cdk::functional_type::cast(rval_type), true)) ||
                ((lval_type->name() == cdk::TYPE_INT ||
                  lval_type->name() == cdk::TYPE_DOUBLE) &&
                 rval_type->name() == cdk::TYPE_UNSPEC)) {
@@ -145,7 +136,7 @@ void til::type_checker::do_string_node(cdk::string_node *const node, int lvl) {
 void til::type_checker::do_null_node(til::null_node *const node, int lvl) {
     ASSERT_UNSPEC;
     node->type(cdk::reference_type::create(
-        4, cdk::primitive_type::create(0, cdk::TYPE_VOID)));
+        4, cdk::primitive_type::create(0, cdk::TYPE_UNSPEC)));
 }
 
 //---------------------------------------------------------------------------
@@ -261,8 +252,8 @@ void til::type_checker::process_additive_expr(
         node->left()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     } else if (is_subtraction && node->left()->is_typed(cdk::TYPE_POINTER) &&
                node->right()->is_typed(cdk::TYPE_POINTER) &&
-               check_compatible_ptr_types(node->left()->type(),
-                                          node->right()->type())) {
+               check_compatible_types(node->left()->type(),
+                                      node->right()->type(), false)) {
         node->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
     } else {
         throw std::string("wrong types in additive binary expression");
@@ -333,9 +324,11 @@ void til::type_checker::process_equality_expr(
 
     node->left()->accept(this, lvl);
     node->right()->accept(this, lvl);
-    if (!process_binary_expr(node, lvl) &&
-        !check_compatible_ptr_types(node->left()->type(),
-                                    node->right()->type())) {
+    if (!(process_binary_expr(node, lvl) ||
+          (node->left()->is_typed(cdk::TYPE_POINTER) &&
+           node->right()->is_typed(cdk::TYPE_POINTER) &&
+           check_compatible_types(node->left()->type(), node->right()->type(),
+                                  false)))) {
         throw std::string(
             "same type expected on both sides of equality operator");
     }
@@ -416,7 +409,7 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
     const auto lval_type = node->lvalue()->type();
     const auto rval_type = node->rvalue()->type();
 
-    if (!check_compatible_types(lval_type, rval_type)) {
+    if (!check_compatible_types(lval_type, rval_type, true)) {
         throw std::string("wrong types in assignment expression");
     }
     node->type(lval_type);
@@ -431,7 +424,7 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
         init->accept(this, lvl);
         if (node->type()) {
             change_type_on_match(node, init);
-            if (!check_compatible_types(node->type(), init->type())) {
+            if (!check_compatible_types(node->type(), init->type(), true)) {
                 throw std::string("wrong type on right side of declaration");
             }
             if (node->type()->name() == cdk::TYPE_UNSPEC) {
@@ -557,7 +550,7 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
          function_output->name() == cdk::TYPE_DOUBLE)) {
         ret_val->type(function_output);
     }
-    if (!check_compatible_types(function_output, ret_val->type())) {
+    if (!check_compatible_types(function_output, ret_val->type(), true)) {
         throw std::string("wrong type in return value of return expression");
     }
 }
@@ -672,5 +665,13 @@ void til::type_checker::do_address_of_node(til::address_of_node *const node,
                                            int lvl) {
     ASSERT_UNSPEC;
     node->lvalue()->accept(this, lvl);
+    if (node->lvalue()->is_typed(cdk::TYPE_POINTER)) {
+        auto ref = cdk::reference_type::cast(node->lvalue()->type());
+        if (ref->referenced()->name() == cdk::TYPE_VOID) {
+            // void!!! is the same as void!! and void!
+            node->type(node->lvalue()->type());
+            return;
+        }
+    }
     node->type(cdk::reference_type::create(4, node->lvalue()->type()));
 }

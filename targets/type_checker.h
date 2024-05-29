@@ -24,13 +24,12 @@ class type_checker : public basic_ast_visitor {
     ~type_checker() { os().flush(); }
 
   protected:
-    bool check_compatible_ptr_types(std::shared_ptr<cdk::basic_type> t1,
-                                    std::shared_ptr<cdk::basic_type> t2);
     bool
     check_compatible_functional_types(std::shared_ptr<cdk::functional_type> t1,
-                                      std::shared_ptr<cdk::functional_type> t2);
+                                      std::shared_ptr<cdk::functional_type> t2,
+                                      bool cov);
     bool check_compatible_types(std::shared_ptr<cdk::basic_type> t1,
-                                std::shared_ptr<cdk::basic_type> t2);
+                                std::shared_ptr<cdk::basic_type> t2, bool cov);
     void change_type_on_match(cdk::typed_node *const lvalue,
                               cdk::typed_node *const rvalue);
 
