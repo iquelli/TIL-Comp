@@ -43,7 +43,7 @@ bool til::type_checker::check_compatible_types(
     const auto t1_name = t1->name();
     const auto t2_name = t2->name();
 
-    if (t1_name == cdk::TYPE_INT || t1_name == cdk::TYPE_DOUBLE) {
+    if (cov && (t1_name == cdk::TYPE_INT || t1_name == cdk::TYPE_DOUBLE)) {
         return t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT;
     } else if (t1_name == cdk::TYPE_STRING) {
         return t2_name == cdk::TYPE_STRING;
@@ -59,35 +59,34 @@ bool til::type_checker::check_compatible_types(
                check_compatible_functional_types(cdk::functional_type::cast(t1),
                                                  cdk::functional_type::cast(t2),
                                                  cov);
-    } else if (t1_name == cdk::TYPE_UNSPEC) {
-        // (var x (f)), where f calls return void, is not allowed
-        return t2_name != cdk::TYPE_VOID;
     } else {
         return t1_name == t2_name;
     }
 }
 
-void til::type_checker::change_type_on_match(cdk::typed_node *const lvalue,
-                                             cdk::typed_node *const rvalue) {
-    const auto lval_type = lvalue->type();
+void til::type_checker::change_type_on_match(
+    std::shared_ptr<cdk::basic_type> lval_type, cdk::typed_node *const rvalue) {
     const auto rval_type = rvalue->type();
 
-    if (lval_type->name() == cdk::TYPE_UNSPEC &&
-        rval_type->name() == cdk::TYPE_UNSPEC) {
-        // assign default type
-        lvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
-        rvalue->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
-    } else if ((lval_type->name() == cdk::TYPE_POINTER &&
-                rval_type->name() == cdk::TYPE_POINTER &&
-                check_compatible_types(lval_type, rval_type, false)) ||
-               (lval_type->name() == cdk::TYPE_FUNCTIONAL &&
-                rval_type->name() == cdk::TYPE_FUNCTIONAL &&
-                check_compatible_functional_types(
-                    cdk::functional_type::cast(lval_type),
-                    cdk::functional_type::cast(rval_type), true)) ||
-               ((lval_type->name() == cdk::TYPE_INT ||
-                 lval_type->name() == cdk::TYPE_DOUBLE) &&
-                rval_type->name() == cdk::TYPE_UNSPEC)) {
+    if (lval_type->name() == cdk::TYPE_POINTER &&
+        rval_type->name() == cdk::TYPE_POINTER) {
+        auto lval_ref = cdk::reference_type::cast(lval_type);
+        auto rval_ref = cdk::reference_type::cast(rval_type);
+        if (rval_ref->referenced()->name() == cdk::TYPE_UNSPEC ||
+            rval_ref->referenced()->name() == cdk::TYPE_VOID ||
+            lval_ref->referenced()->name() == cdk::TYPE_VOID) {
+            rvalue->type(lval_type);
+        }
+    }
+
+    if ((lval_type->name() == cdk::TYPE_FUNCTIONAL &&
+         rval_type->name() == cdk::TYPE_FUNCTIONAL &&
+         check_compatible_functional_types(
+             cdk::functional_type::cast(lval_type),
+             cdk::functional_type::cast(rval_type), true)) ||
+        ((lval_type->name() == cdk::TYPE_INT ||
+          lval_type->name() == cdk::TYPE_DOUBLE) &&
+         rval_type->name() == cdk::TYPE_UNSPEC)) {
         rvalue->type(lval_type);
     }
 }
@@ -404,11 +403,10 @@ void til::type_checker::do_assignment_node(cdk::assignment_node *const node,
 
     node->lvalue()->accept(this, lvl);
     node->rvalue()->accept(this, lvl);
+    change_type_on_match(node->lvalue()->type(), node->rvalue());
 
-    change_type_on_match(node->lvalue(), node->rvalue());
     const auto lval_type = node->lvalue()->type();
     const auto rval_type = node->rvalue()->type();
-
     if (!check_compatible_types(lval_type, rval_type, true)) {
         throw std::string("wrong types in assignment expression");
     }
@@ -422,15 +420,25 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
     const auto &init = node->initializer();
     if (init) {
         init->accept(this, lvl);
-        if (node->type()) {
-            change_type_on_match(node, init);
+        if (node->type()) { // non-var
+            change_type_on_match(node->type(), init);
             if (!check_compatible_types(node->type(), init->type(), true)) {
                 throw std::string("wrong type on right side of declaration");
             }
-            if (node->type()->name() == cdk::TYPE_UNSPEC) {
-                node->type(init->type());
+        } else { // var
+            if (init->is_typed(cdk::TYPE_UNSPEC)) {
+                // assign default type
+                init->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+            } else if (init->is_typed(cdk::TYPE_VOID)) {
+                // (var x (f)), where f calls return void, is not allowed
+                throw std::string("cannot declare a void variable");
+            } else if (init->is_typed(cdk::TYPE_POINTER)) {
+                auto ref = cdk::reference_type::cast(init->type());
+                if (ref->referenced()->name() == cdk::TYPE_UNSPEC) {
+                    init->type(cdk::reference_type::create(
+                        4, cdk::primitive_type::create(4, cdk::TYPE_INT)));
+                }
             }
-        } else {
             node->type(init->type());
         }
     }
@@ -491,24 +499,12 @@ void til::type_checker::do_function_call_node(
         for (size_t i = 0; i < args_types.size(); ++i) {
             const auto &arg = dynamic_cast<cdk::expression_node *>(
                 node->arguments()->node(i));
-            if (arg->type()->name() == cdk::TYPE_UNSPEC &&
-                args_types[i]->name() == cdk::TYPE_INT) {
-                arg->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
-                continue;
-            } else if (arg->type()->name() == cdk::TYPE_UNSPEC &&
-                       args_types[i]->name() == cdk::TYPE_DOUBLE) {
-                arg->type(cdk::primitive_type::create(8, cdk::TYPE_DOUBLE));
-                continue;
+            change_type_on_match(args_types[i], arg);
+            if (!check_compatible_types(args_types[i], arg->type(), true)) {
+                throw std::string("wrong type in argument " +
+                                  std::to_string(i + 1) +
+                                  " of function call expression");
             }
-            // note that the second condition is to allow passing an int as a
-            // double
-            if ((args_types[i] == arg->type()) ||
-                (args_types[i]->name() == cdk::TYPE_DOUBLE &&
-                 arg->type()->name() == cdk::TYPE_INT)) {
-                continue;
-            }
-            throw std::string(
-                "wrong type in argument of function call expression");
         }
     }
 }
@@ -545,11 +541,7 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
     }
 
     ret_val->accept(this, lvl);
-    if (ret_val->is_typed(cdk::TYPE_UNSPEC) &&
-        (function_output->name() == cdk::TYPE_INT ||
-         function_output->name() == cdk::TYPE_DOUBLE)) {
-        ret_val->type(function_output);
-    }
+    change_type_on_match(function_output, ret_val);
     if (!check_compatible_types(function_output, ret_val->type(), true)) {
         throw std::string("wrong type in return value of return expression");
     }
