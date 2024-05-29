@@ -453,12 +453,11 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
         til::make_symbol(node->type(), node->identifier(),
                          (bool)node->initializer(), node->qualifier());
     if (!_symtab.insert(node->identifier(), new_symbol)) {
-        // in this case, we are redeclaring a variable
-        const auto previous_symbol = _symtab.find_local(node->identifier());
-        // the redeclared type must be the exact same
-        if (previous_symbol->type()->name() != node->type()->name()) {
-            throw std::string("cannot redeclare variable '" +
-                              node->identifier() + "' with incompatible type");
+        const auto prev_symbol = _symtab.find(node->identifier());
+        if (prev_symbol->qualifier() != tFORWARD ||
+            !check_compatible_types(prev_symbol->type(), node->type(), false)) {
+            throw std::string("redeclaration of variable '" +
+                              node->identifier() + "'");
         }
         _symtab.replace(node->identifier(), new_symbol);
     }
