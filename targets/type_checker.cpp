@@ -530,12 +530,17 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
             return;
         }
         throw std::string("return statement found outside function");
-    } else if (!ret_val) {
-        return;
     }
 
     const auto &fun_sym_type = cdk::functional_type::cast(function->type());
     const auto function_output = fun_sym_type->output(0);
+    if (!ret_val) {
+        if (fun_sym_type->output() &&
+            function_output->name() != cdk::TYPE_VOID) {
+            throw std::string("no return with a value in non-void function");
+        }
+        return;
+    }
     if (fun_sym_type->output() && function_output->name() == cdk::TYPE_VOID) {
         throw std::string("return with a value in void function");
     } else if (!fun_sym_type->output()) {
