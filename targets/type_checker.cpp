@@ -443,6 +443,12 @@ void til::type_checker::do_declaration_node(til::declaration_node *const node,
         }
     }
 
+    if (node->qualifier() == tEXTERNAL &&
+        !node->is_typed(cdk::TYPE_FUNCTIONAL)) {
+        throw std::string("non-function '" + node->identifier() +
+                          "' declared as external");
+    }
+
     const auto new_symbol =
         til::make_symbol(node->type(), node->identifier(),
                          (bool)node->initializer(), node->qualifier());
@@ -489,22 +495,19 @@ void til::type_checker::do_function_call_node(
         node->type(cdk::functional_type::cast(type)->output(0));
     }
 
-    if (node->arguments()) {
-        if (args_types.size() != node->arguments()->size()) {
-            throw std::string(
-                "wrong number of arguments in function call expression");
-        }
-        node->arguments()->accept(this, lvl);
-
-        for (size_t i = 0; i < args_types.size(); ++i) {
-            const auto &arg = dynamic_cast<cdk::expression_node *>(
-                node->arguments()->node(i));
-            change_type_on_match(args_types[i], arg);
-            if (!check_compatible_types(args_types[i], arg->type(), true)) {
-                throw std::string("wrong type in argument " +
-                                  std::to_string(i + 1) +
-                                  " of function call expression");
-            }
+    if (args_types.size() != node->arguments()->size()) {
+        throw std::string(
+            "wrong number of arguments in function call expression");
+    }
+    node->arguments()->accept(this, lvl);
+    for (size_t i = 0; i < args_types.size(); ++i) {
+        const auto &arg =
+            dynamic_cast<cdk::expression_node *>(node->arguments()->node(i));
+        change_type_on_match(args_types[i], arg);
+        if (!check_compatible_types(args_types[i], arg->type(), true)) {
+            throw std::string("wrong type in argument " +
+                              std::to_string(i + 1) +
+                              " of function call expression");
         }
     }
 }
@@ -533,10 +536,9 @@ void til::type_checker::do_return_node(til::return_node *const node, int lvl) {
 
     const auto &fun_sym_type = cdk::functional_type::cast(function->type());
     const auto function_output = fun_sym_type->output(0);
-    const bool has_output = fun_sym_type->output() != nullptr;
-    if (has_output && function_output->name() == cdk::TYPE_VOID) {
+    if (fun_sym_type->output() && function_output->name() == cdk::TYPE_VOID) {
         throw std::string("return with a value in void function");
-    } else if (!has_output) {
+    } else if (!fun_sym_type->output()) {
         throw std::string("unknown return type in function");
     }
 
