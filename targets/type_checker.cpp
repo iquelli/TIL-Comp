@@ -29,7 +29,7 @@ bool til::type_checker::check_compatible_functional_types(
 
     // The types of the arguments must be compatible
     for (size_t i = 0; i < t1->input_length(); ++i) {
-        if (!check_compatible_types(t1->input(i), t2->input(i), cov)) {
+        if (!check_compatible_types(t2->input(i), t1->input(i), cov)) {
             return false;
         }
     }
@@ -43,7 +43,7 @@ bool til::type_checker::check_compatible_types(
     const auto t1_name = t1->name();
     const auto t2_name = t2->name();
 
-    if (cov && (t1_name == cdk::TYPE_INT || t1_name == cdk::TYPE_DOUBLE)) {
+    if (cov && t1_name == cdk::TYPE_DOUBLE) {
         return t2_name == cdk::TYPE_DOUBLE || t2_name == cdk::TYPE_INT;
     } else if (t1_name == cdk::TYPE_STRING) {
         return t2_name == cdk::TYPE_STRING;
