@@ -384,10 +384,8 @@ void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
                                               int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
-    const auto id = node->identifier();
-    const auto type_size = node->type()->size(); // bytes
     int offset = 0;                              // 0 is global
-
+    const auto type_size = node->type()->size(); // bytes
     if (_inFunctionArgs) {
         offset = _offset;
         _offset += type_size;
@@ -398,8 +396,8 @@ void til::postfix_writer::do_declaration_node(til::declaration_node *const node,
 
     const auto symbol = new_symbol();
     if (symbol) {
-        symbol->set_offset(offset);
         reset_new_symbol();
+        symbol->set_offset(offset);
     }
 
     if (node->initializer()) {
@@ -417,26 +415,31 @@ void til::postfix_writer::process_local_var_init(
     std::shared_ptr<til::symbol> symbol,
     cdk::expression_node *const initializer, int lvl) {
     initializer->accept(this, lvl);
-
-    if (symbol->type()->name() == cdk::TYPE_INT ||
-        symbol->type()->name() == cdk::TYPE_STRING ||
-        symbol->type()->name() == cdk::TYPE_POINTER ||
-        symbol->type()->name() == cdk::TYPE_FUNCTIONAL ||
-        symbol->type()->name() == cdk::TYPE_UNSPEC) {
-        // UNSPEC is for cases like `(var x (read))`
-        _pf.LOCAL(symbol->offset());
-        _pf.STINT();
-    } else if (symbol->type()->name() == cdk::TYPE_DOUBLE) {
+    if (symbol->type()->name() == cdk::TYPE_DOUBLE) {
         if (initializer->is_typed(cdk::TYPE_INT)) {
             _pf.I2D();
         }
         _pf.LOCAL(symbol->offset());
         _pf.STDOUBLE();
+    } else {
+        _pf.LOCAL(symbol->offset());
+        _pf.STINT();
     }
 }
 void til::postfix_writer::process_global_var_init(
     std::shared_ptr<til::symbol> symbol,
     cdk::expression_node *const initializer, int lvl) {
+    if (!dynamic_cast<cdk::integer_node *>(initializer) &&
+        !dynamic_cast<cdk::double_node *>(initializer) &&
+        !dynamic_cast<cdk::string_node *>(initializer) &&
+        !dynamic_cast<til::null_node *>(initializer) &&
+        !dynamic_cast<til::function_node *>(initializer)) {
+        error(initializer->lineno(),
+              "non-literal initializer for global variable '" + symbol->name() +
+                  "'");
+        return;
+    }
+
     if (symbol->type()->name() == cdk::TYPE_INT ||
         symbol->type()->name() == cdk::TYPE_STRING ||
         symbol->type()->name() == cdk::TYPE_POINTER) {
@@ -448,7 +451,6 @@ void til::postfix_writer::process_global_var_init(
         _pf.DATA();
         _pf.ALIGN();
         _pf.LABEL(symbol->name());
-
         const cdk::integer_node *dclini;
         cdk::double_node *ddi;
         if (initializer->type()->name() == cdk::TYPE_INT) {
@@ -479,23 +481,20 @@ void til::postfix_writer::do_function_node(til::function_node *const node,
 }
 void til::postfix_writer::process_main_function(til::function_node *const node,
                                                 int lvl) {
-    for (auto s_name : _symbolsToDeclare) {
-        const auto symbol = _symtab.find(s_name);
-        if (symbol->qualifier() == tEXTERNAL) {
-            _functionsToDeclare.insert(s_name);
+    for (auto symbol_name : _symbolsToDeclare) {
+        const auto symbol = _symtab.find(symbol_name);
+        if (symbol->qualifier() == tEXTERNAL ||
+            symbol->qualifier() == tFORWARD) {
+            _functionsToDeclare.insert(symbol_name);
             continue;
         }
-
         _pf.BSS();
         _pf.ALIGN();
-        _pf.LABEL(s_name);
+        _pf.LABEL(symbol_name);
         _pf.SALLOC(symbol->type()->size());
     }
 
-    const auto main =
-        til::make_symbol(cdk::functional_type::create(
-                             cdk::primitive_type::create(4, cdk::TYPE_INT)),
-                         "_main", 0, tPRIVATE);
+    const auto main = til::make_symbol(node->type(), "_main", 0, tPRIVATE);
     _symtab.insert(main->name(), main);
     _functions.push_back(main);
     _functionLabels.push_back("_main");
@@ -519,7 +518,7 @@ void til::postfix_writer::process_main_function(til::function_node *const node,
 
     _functionLabels.pop_back();
     _functions.pop_back();
-    if (!_mainReturnSeen) {
+    if (!_mainReturnSeen) { // in case of no return instruction
         _pf.INT(0);
         _pf.STFVAL32();
     }
@@ -534,30 +533,27 @@ void til::postfix_writer::process_normal_function(
     til::function_node *const node, int lvl) {
     _symtab.push(); // arguments context
     auto function = til::make_symbol(node->type(), "@", 0, tPRIVATE);
-    if (_symtab.find_local(function->name())) {
+    if (!_symtab.insert(function->name(), function)) {
         _symtab.replace(function->name(), function);
-    } else {
-        _symtab.insert(function->name(), function);
     }
     _functions.push_back(function);
-
-    const auto functionLabel = mklbl(++_lbl);
-    _functionLabels.push_back(functionLabel);
+    const auto function_label = mklbl(++_lbl);
+    _functionLabels.push_back(function_label);
 
     const auto previous_offset = _offset;
     _offset = 8;
 
     if (node->arguments()) {
         _inFunctionArgs = true;
-        for (size_t ix = 0; ix < node->arguments()->size(); ix++) {
-            node->arguments()->node(ix)->accept(this, lvl);
+        for (size_t i = 0; i < node->arguments()->size(); ++i) {
+            node->arguments()->node(i)->accept(this, lvl);
         }
         _inFunctionArgs = false;
     }
 
-    _pf.TEXT(functionLabel);
+    _pf.TEXT(function_label);
     _pf.ALIGN();
-    _pf.LABEL(functionLabel);
+    _pf.LABEL(function_label);
 
     // calculate the stack size for local variables
     frame_size_calculator fsc(_compiler, _symtab);
@@ -565,26 +561,25 @@ void til::postfix_writer::process_normal_function(
     _pf.ENTER(fsc.localsize());
 
     _offset = 0; // reset offset
-    auto _previouslyInFunctionBody = _inFunctionBody;
+    auto prev_in_function_body = _inFunctionBody;
     _inFunctionBody = true;
     if (node->block()) {
         node->block()->accept(this, lvl);
     }
-    _inFunctionBody = _previouslyInFunctionBody;
+    _inFunctionBody = prev_in_function_body;
     _symtab.pop(); // leave arguments context
     _offset = previous_offset;
 
     if (function) {
         _functions.pop_back();
     }
-
     _pf.LEAVE();
     _pf.RET();
 
     if (_inFunctionBody) {
         _functionLabels.pop_back();
         _pf.TEXT(_functionLabels.back());
-        _pf.ADDR(functionLabel);
+        _pf.ADDR(function_label);
     }
 }
 
