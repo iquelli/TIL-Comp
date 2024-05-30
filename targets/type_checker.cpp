@@ -479,7 +479,6 @@ void til::type_checker::do_function_call_node(
         if (!node->func()->is_typed(cdk::TYPE_FUNCTIONAL)) {
             throw std::string("wrong type in function call expression");
         }
-
         const auto &type = node->func()->type();
         args_types = cdk::functional_type::cast(type)->input()->components();
         node->type(cdk::functional_type::cast(type)->output(0));

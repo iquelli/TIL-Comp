@@ -321,10 +321,8 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node,
 
     const auto symbol = _symtab.find(node->name());
 
-    // a symbol may be forwarded from another module, global or local
+    // a symbol may be external, global or local
     if (symbol->qualifier() == tEXTERNAL) {
-        // if it's been forwarded, we will call it instead of branching to it,
-        // so as such, we'll need its label
         _currentForwardLabel = symbol->name();
     } else if (symbol->is_global()) {
         _pf.ADDR(symbol->name());
@@ -348,13 +346,11 @@ void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node,
     ASSERT_SAFE_EXPRESSIONS;
 
     node->lvalue()->accept(this, lvl);
+    if (!_currentForwardLabel.empty()) {
+        return; // external method, so we call it by their label
+    }
     if (!node->is_typed(cdk::TYPE_DOUBLE)) {
-        // integers, pointers, strings, functionals
-        // if we're dealing with forwarded methods, we will call them by their
-        // label and not branch to them, therefore loading them is useless
-        if (_currentForwardLabel.empty()) {
-            _pf.LDINT();
-        }
+        _pf.LDINT(); // integers, pointers, strings, functionals
     } else {
         _pf.LDDOUBLE();
     }
@@ -374,7 +370,7 @@ void til::postfix_writer::do_assignment_node(cdk::assignment_node *const node,
         _pf.DUP64();
     }
 
-    node->lvalue()->accept(this, lvl);
+    node->lvalue()->accept(this, lvl); // get address to store the val
     if (!node->is_typed(cdk::TYPE_DOUBLE)) {
         _pf.STINT();
     } else {
@@ -728,8 +724,10 @@ void til::postfix_writer::do_evaluation_node(til::evaluation_node *const node,
                                              int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
-    node->argument()->accept(this, lvl);         // determine the value
-    _pf.TRASH(node->argument()->type()->size()); // delete it
+    node->argument()->accept(this, lvl); // determine the value
+    if (node->argument()->type()->size() > 0) {
+        _pf.TRASH(node->argument()->type()->size()); // delete it
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -769,7 +767,6 @@ void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
     if (node->is_typed(cdk::TYPE_INT) || node->is_typed(cdk::TYPE_UNSPEC)) {
-        // UNSPEC is for cases like `(var x (read))`
         _functionsToDeclare.insert("readi");
         _pf.CALL("readi");
         _pf.LDFVAL32();
@@ -793,8 +790,8 @@ void til::postfix_writer::do_if_node(til::if_node *const node, int lvl) {
     _pf.JZ(mklbl(lbl = ++_lbl));
 
     node->block()->accept(this, lvl);
-    _lastBlockInstrSeen =
-        false; // in case it's not a block_node, but a single instruction
+    // in case it's not a block_node, but a single instruction
+    _lastBlockInstrSeen = false;
 
     _pf.ALIGN();
     _pf.LABEL(mklbl(lbl));
@@ -810,16 +807,16 @@ void til::postfix_writer::do_if_else_node(til::if_else_node *const node,
     _pf.JZ(mklbl(lbl1 = ++_lbl));
 
     node->thenblock()->accept(this, lvl);
-    _lastBlockInstrSeen =
-        false; // in case it's not a block_node, but a single instruction
+    // in case it's not a block_node, but a single instruction
+    _lastBlockInstrSeen = false;
 
     _pf.JMP(mklbl(lbl2 = ++_lbl));
     _pf.ALIGN();
     _pf.LABEL(mklbl(lbl1));
 
     node->elseblock()->accept(this, lvl);
-    _lastBlockInstrSeen =
-        false; // in case it's not a block_node, but a single instruction
+    // in case it's not a block_node, but a single instruction
+    _lastBlockInstrSeen = false;
 
     _pf.ALIGN();
     _pf.LABEL(mklbl(lbl1 = lbl2));
@@ -841,8 +838,8 @@ void til::postfix_writer::do_loop_node(til::loop_node *const node, int lvl) {
     _loopEnd.push_back(endLbl);   // the deepest loop end label
 
     node->block()->accept(this, lvl);
-    _lastBlockInstrSeen =
-        false; // in case it's not a block_node, but a single instruction
+    // in case it's not a block_node, but a single instruction
+    _lastBlockInstrSeen = false;
 
     _loopCond.pop_back();
     _loopEnd.pop_back();
