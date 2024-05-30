@@ -30,10 +30,8 @@ class postfix_writer : public basic_ast_visitor {
     /** Loop labels used for next/stop nodes */
     std::vector<int> _loopCond, _loopEnd;
 
-    /**
-     * A forwarded function label, that is going to be called and not branched.
-     */
-    std::string _currentForwardLabel;
+    /** An external function label, that is going to be called. */
+    std::string _currentExternalLabel;
 
     /** To have access to a function's segments. */
     std::vector<std::string> _functionLabels;

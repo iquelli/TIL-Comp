@@ -323,7 +323,7 @@ void til::postfix_writer::do_variable_node(cdk::variable_node *const node,
 
     // a symbol may be external, global or local
     if (symbol->qualifier() == tEXTERNAL) {
-        _currentForwardLabel = symbol->name();
+        _currentExternalLabel = symbol->name();
     } else if (symbol->is_global()) {
         _pf.ADDR(symbol->name());
     } else {
@@ -346,7 +346,7 @@ void til::postfix_writer::do_rvalue_node(cdk::rvalue_node *const node,
     ASSERT_SAFE_EXPRESSIONS;
 
     node->lvalue()->accept(this, lvl);
-    if (!_currentForwardLabel.empty()) {
+    if (!_currentExternalLabel.empty()) {
         return; // external method, so we call it by their label
     }
     if (!node->is_typed(cdk::TYPE_DOUBLE)) {
@@ -432,9 +432,6 @@ void til::postfix_writer::process_local_var_init(
         }
         _pf.LOCAL(symbol->offset());
         _pf.STDOUBLE();
-    } else {
-        error(initializer->lineno(),
-              "variable initialization has invalid type");
     }
 }
 void til::postfix_writer::process_global_var_init(
@@ -461,9 +458,6 @@ void til::postfix_writer::process_global_var_init(
             ddi->accept(this, lvl);
         } else if (initializer->type()->name() == cdk::TYPE_DOUBLE) {
             initializer->accept(this, lvl);
-        } else {
-            error(initializer->lineno(),
-                  "double variable initialization has invalid type");
         }
     } else if (symbol->type()->name() == cdk::TYPE_FUNCTIONAL) {
         _functions.push_back(symbol);
@@ -475,9 +469,6 @@ void til::postfix_writer::process_global_var_init(
         }
         _pf.LABEL(symbol->name());
         _pf.SADDR(_functionLabels.back());
-    } else {
-        error(initializer->lineno(),
-              "variable initialization has invalid type");
     }
 }
 
@@ -535,8 +526,8 @@ void til::postfix_writer::process_main_function(til::function_node *const node,
     _pf.LEAVE();
     _pf.RET();
 
-    for (auto forwarded_function : _functionsToDeclare) {
-        _pf.EXTERN(forwarded_function);
+    for (auto external_function : _functionsToDeclare) {
+        _pf.EXTERN(external_function);
     }
 }
 void til::postfix_writer::process_normal_function(
@@ -602,13 +593,11 @@ void til::postfix_writer::do_function_call_node(
     ASSERT_SAFE_EXPRESSIONS;
 
     std::vector<std::shared_ptr<cdk::basic_type>> arg_types;
-    const auto function = node->func();
     if (node->func()) {
-        arg_types =
-            cdk::functional_type::cast(function->type())->input()->components();
-    } else { // recursive call -> @
-        // get the arguments associated with the symbol of the function to
-        // recursively call
+        arg_types = cdk::functional_type::cast(node->func()->type())
+                        ->input()
+                        ->components();
+    } else { // recursive call (@)
         auto deepest_function = _functions.back();
         arg_types = cdk::functional_type::cast(deepest_function->type())
                         ->input()
@@ -632,17 +621,16 @@ void til::postfix_writer::do_function_call_node(
         }
     }
 
-    // 3 cases -> non-recursive call, forwarded call or recursive call
-    if (!function) { // recursive calls
+    // 3 cases -> non-recursive call, external call or recursive call
+    if (!node->func()) { // recursive calls
         _pf.CALL(_functionLabels.back());
     } else { // non-recursive calls
-        _currentForwardLabel.clear();
-        function->accept(this, lvl);
-        if (_currentForwardLabel
-                .empty()) { // it is a non-recursive and non-forwarded call
+        _currentExternalLabel.clear();
+        node->func()->accept(this, lvl);
+        if (_currentExternalLabel.empty()) { // it is a non-external call
             _pf.BRANCH();
-        } else { // forwarded call
-            _pf.CALL(_currentForwardLabel);
+        } else { // external call
+            _pf.CALL(_currentExternalLabel);
         }
     }
 
@@ -651,17 +639,14 @@ void til::postfix_writer::do_function_call_node(
         _pf.TRASH(args_bytes);
     }
 
-    if (node->type()->name() == cdk::TYPE_VOID) {
-        // do nothing
-    } else if (node->type()->name() == cdk::TYPE_INT) {
-        if (_currentForwardLabel.empty()) {
+    if (node->type()->name() == cdk::TYPE_INT) {
+        if (_currentExternalLabel.empty()) {
             // because every non-main function returns double, we need to
-            // reconvert it back to int in the cases where
+            // reconvert it back to int
             _pf.LDFVAL64();
             _pf.D2I();
         } else {
-            // forwarded methods already return int
-            _pf.LDFVAL32();
+            _pf.LDFVAL32(); // external methods already return int
         }
     } else if (node->type()->name() == cdk::TYPE_STRING ||
                node->type()->name() == cdk::TYPE_POINTER ||
@@ -669,26 +654,23 @@ void til::postfix_writer::do_function_call_node(
         _pf.LDFVAL32();
     } else if (node->type()->name() == cdk::TYPE_DOUBLE) {
         _pf.LDFVAL64();
-    } else { // shouldn't happen
-        error(node->lineno(), "cannot call expression of unknown type");
     }
 
-    _currentForwardLabel.clear();
+    _currentExternalLabel.clear();
 }
 
 void til::postfix_writer::do_return_node(til::return_node *const node,
                                          int lvl) {
     ASSERT_SAFE_EXPRESSIONS;
 
-    // type of current function
-    const auto current_func_type_name =
+    const auto func_out_type_name =
         cdk::functional_type::cast(_functions.back()->type())
             ->output(0)
             ->name();
 
-    if (current_func_type_name != cdk::TYPE_VOID) {
+    if (func_out_type_name != cdk::TYPE_VOID) {
         node->retval()->accept(this, lvl);
-        if (current_func_type_name == cdk::TYPE_INT) {
+        if (func_out_type_name == cdk::TYPE_INT) {
             if (_functions.back()->is_main()) {
                 // in the case of the main function we have to return an int
                 _mainReturnSeen = true;
@@ -699,17 +681,15 @@ void til::postfix_writer::do_return_node(til::return_node *const node,
                 _pf.I2D();
                 _pf.STFVAL64();
             }
-        } else if (current_func_type_name == cdk::TYPE_STRING ||
-                   current_func_type_name == cdk::TYPE_POINTER ||
-                   current_func_type_name == cdk::TYPE_FUNCTIONAL) {
+        } else if (func_out_type_name == cdk::TYPE_STRING ||
+                   func_out_type_name == cdk::TYPE_POINTER ||
+                   func_out_type_name == cdk::TYPE_FUNCTIONAL) {
             _pf.STFVAL32(); // remove 4 bytes from the stack
-        } else if (current_func_type_name == cdk::TYPE_DOUBLE) {
+        } else if (func_out_type_name == cdk::TYPE_DOUBLE) {
             if (!node->retval()->is_typed(cdk::TYPE_DOUBLE)) {
                 _pf.I2D();
             }
             _pf.STFVAL64(); // remove 8 bytes from the stack
-        } else {
-            error(node->lineno(), "invalid return type");
         }
     }
 
@@ -752,8 +732,6 @@ void til::postfix_writer::do_print_node(til::print_node *const node, int lvl) {
             _functionsToDeclare.insert("prints");
             _pf.CALL("prints");
             _pf.TRASH(4); // delete the printed value's address
-        } else {
-            error(node->lineno(), "print expression cannot print unknown type");
         }
     }
 
@@ -774,8 +752,6 @@ void til::postfix_writer::do_read_node(til::read_node *const node, int lvl) {
         _functionsToDeclare.insert("readd");
         _pf.CALL("readd");
         _pf.LDFVAL64();
-    } else {
-        error(node->lineno(), "read expression cannot read unknown type");
     }
 }
 
