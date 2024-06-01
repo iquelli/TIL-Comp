@@ -374,3 +374,26 @@ void til::xml_writer::do_address_of_node(til::address_of_node *const node,
     node->lvalue()->accept(this, lvl + 2);
     closeTag(node, lvl);
 }
+
+//---------------------------------------------------------------------------
+
+void til::xml_writer::do_sweep_node(til::sweep_node *const node, int lvl) {
+    // ASSERT_SAFE_EXPRESSIONS;
+    openTag(node, lvl);
+    openTag("vector", lvl + 2);
+    node->vec()->accept(this, lvl + 4);
+    closeTag("vector", lvl + 2);
+    openTag("low", lvl + 2);
+    node->low()->accept(this, lvl + 4);
+    closeTag("low", lvl + 2);
+    openTag("high", lvl + 2);
+    node->high()->accept(this, lvl + 4);
+    closeTag("high", lvl + 2);
+    openTag("function", lvl + 2);
+    node->func()->accept(this, lvl + 4);
+    closeTag("function", lvl + 2);
+    openTag("condition", lvl + 2);
+    node->cond()->accept(this, lvl + 4);
+    closeTag("condition", lvl + 2);
+    closeTag(node, lvl);
+}

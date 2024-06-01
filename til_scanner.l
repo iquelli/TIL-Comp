@@ -80,6 +80,12 @@
 
 "program"  return tPROGRAM;
 
+"sweep"    return tSWEEP;
+"->"       return tGIVEN;
+".."       return tUNTIL;
+"with"     return tWITH;
+"unless"   return tUNLESS;
+
   /* ====================================================================== */
   /* ====[                    3.4 - TYPES                             ]==== */
   /* ====================================================================== */

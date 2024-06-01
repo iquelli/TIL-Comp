@@ -672,3 +672,46 @@ void til::type_checker::do_address_of_node(til::address_of_node *const node,
     }
     node->type(cdk::reference_type::create(4, node->lvalue()->type()));
 }
+
+//---------------------------------------------------------------------------
+
+void til::type_checker::do_sweep_node(til::sweep_node *const node, int lvl) {
+    node->vec()->accept(this, lvl);
+    if (!node->vec()->is_typed(cdk::TYPE_POINTER)) {
+        throw std::string("vector needs to be a pointer");
+    }
+
+    node->low()->accept(this, lvl);
+    if (node->low()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->low()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->low()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("low needs to be an integer");
+    }
+
+    node->high()->accept(this, lvl);
+    if (node->high()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->high()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->high()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("high needs to be an integer");
+    }
+
+    node->func()->accept(this, lvl);
+    if (!node->func()->is_typed(cdk::TYPE_FUNCTIONAL)) {
+        throw std::string("function has wrong type");
+    }
+    auto func_type = cdk::functional_type::cast(node->func()->type());
+    if (func_type->input_length() != 1) {
+        throw std::string("function must only receive 1 argument");
+    }
+    auto vec_ref_type = cdk::reference_type::cast(node->vec()->type());
+    if (!check_compatible_types(func_type->input(0), vec_ref_type->referenced(), true)) {
+        throw std::string("function call has incompatible argument type with the vector type");
+    }
+
+    node->cond()->accept(this, lvl);
+    if (node->cond()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->cond()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->cond()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("condition needs to be an integer");
+    }
+}

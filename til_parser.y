@@ -46,6 +46,7 @@
 %token tBLOCK tIF tLOOP tSTOP tNEXT tRETURN tPRINT tPRINTLN
 %token tREAD tNULL tSET tINDEX tOBJECTS tSIZEOF tFUNCTION
 %token tPROGRAM
+%token tSWEEP tGIVEN tUNTIL tWITH tUNLESS
 
 %token tOR
 %token tAND
@@ -149,6 +150,7 @@ instr : expr                         { $$ = new til::evaluation_node(LINE, $1); 
       | '(' tIF expr instr ')'       { $$ = new til::if_node(LINE, $3, $4); }
       | '(' tIF expr instr instr ')' { $$ = new til::if_else_node(LINE, $3, $4, $5); }
       | '(' tLOOP expr instr ')'     { $$ = new til::loop_node(LINE, $3, $4); }
+      | '(' tSWEEP expr tGIVEN expr tUNTIL expr tWITH expr tUNLESS expr ')' { $$ = new til::sweep_node(LINE, $3, $5, $7, $9, $11); }
       | '(' tBLOCK decls_instrs ')'  { $$ = $3; }
       ;
 
