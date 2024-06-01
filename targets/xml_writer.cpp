@@ -374,3 +374,9 @@ void til::xml_writer::do_address_of_node(til::address_of_node *const node,
     node->lvalue()->accept(this, lvl + 2);
     closeTag(node, lvl);
 }
+
+//---------------------------------------------------------------------------
+
+void til::xml_writer::do_between_node(til::between_node *const node, int lvl) {
+    // EMPTY: was not needed for the tp
+}

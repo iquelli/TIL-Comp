@@ -1,0 +1,21 @@
+(program
+    (var c (function (int)
+        (println "this should only run once")
+        (return 1)
+    ))
+    (var square (function (void (int el))
+        (println (* el el))
+    ))
+
+    (var v (objects 5))
+    (set (index v 0) 1)
+    (set (index v 1) 2)
+    (set (index v 2) 3)
+    (set (index v 3) 4)
+    (set (index v 4) 5)
+    (between (c) 2 square v)
+    (println "")
+    (between 3 4 square v)
+
+    (return 0)
+)

@@ -887,3 +887,42 @@ void til::postfix_writer::do_address_of_node(til::address_of_node *const node,
 
     node->lvalue()->accept(this, lvl);
 }
+
+//---------------------------------------------------------------------------
+
+void til::postfix_writer::do_between_node(til::between_node *const node, int lvl) {
+    ASSERT_SAFE_EXPRESSIONS;
+
+    _symtab.push();
+    auto lineno = node->lineno();
+
+    std::string it_name = "_it";
+    auto it_decl = new til::declaration_node(lineno, tPRIVATE, cdk::primitive_type::create(4, cdk::TYPE_INT), it_name, node->low());
+    it_decl->accept(this, lvl);
+    auto it_var = new cdk::variable_node(lineno, it_name);
+    auto it_rval = new cdk::rvalue_node(lineno, it_var);
+
+    std::string high_name = "_high";
+    auto high_decl = new til::declaration_node(lineno, tPRIVATE, cdk::primitive_type::create(4, cdk::TYPE_INT), high_name, node->high());
+    high_decl->accept(this, lvl);
+    auto high_var = new cdk::variable_node(lineno, high_name);
+    auto high_rval = new cdk::rvalue_node(lineno, high_var);
+
+    auto vec_index = new til::index_node(lineno, node->vec(), it_rval);
+    auto vec_index_rval = new cdk::rvalue_node(lineno, vec_index);
+    auto func_call_arg = new cdk::sequence_node(lineno, vec_index_rval);
+    auto func_call = new til::function_call_node(lineno, node->func(), func_call_arg);
+    auto func_call_eval = new til::evaluation_node(lineno, func_call);
+
+    auto it_inc = new cdk::add_node(lineno, it_rval, new cdk::integer_node(lineno, 1));
+    auto it_assign = new cdk::assignment_node(lineno, it_var, it_inc);
+    auto it_assign_eval = new til::evaluation_node(lineno, it_assign);
+
+    auto loop_cond = new cdk::le_node(lineno, it_rval, high_rval);
+    auto loop_body = new cdk::sequence_node(lineno, func_call_eval);
+    loop_body = new cdk::sequence_node(lineno, it_assign_eval, loop_body);
+    auto loop_node = new til::loop_node(lineno, loop_cond, loop_body);
+
+    loop_node->accept(this, lvl);
+    _symtab.pop();
+}

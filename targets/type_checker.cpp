@@ -672,3 +672,40 @@ void til::type_checker::do_address_of_node(til::address_of_node *const node,
     }
     node->type(cdk::reference_type::create(4, node->lvalue()->type()));
 }
+
+//---------------------------------------------------------------------------
+
+void til::type_checker::do_between_node(til::between_node *const node, int lvl) {
+    node->low()->accept(this, lvl);
+    if (node->low()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->low()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->low()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("low needs to be an integer in between instruction");
+    }
+
+    node->high()->accept(this, lvl);
+    if (node->high()->is_typed(cdk::TYPE_UNSPEC)) {
+        node->high()->type(cdk::primitive_type::create(4, cdk::TYPE_INT));
+    } else if (!node->high()->is_typed(cdk::TYPE_INT)) {
+        throw std::string("high needs to be an integer in between instruction");
+    }
+
+    node->func()->accept(this, lvl);
+    if (!node->func()->is_typed(cdk::TYPE_FUNCTIONAL)) {
+        throw std::string("function has wrong type in between instruction");
+    }
+
+    node->vec()->accept(this, lvl);
+    if (!node->vec()->is_typed(cdk::TYPE_POINTER)) {
+        throw std::string("vector needs to be a pointer in between instruction");
+    }
+
+    auto func_type = cdk::functional_type::cast(node->func()->type());
+    if (func_type->input_length() != 1) {
+        throw std::string("function must only receive 1 argument in between instruction");
+    }
+    auto vec_ref_type = cdk::reference_type::cast(node->vec()->type());
+    if (!check_compatible_types(func_type->input(0), vec_ref_type->referenced(), true)) {
+        throw std::string("function has incompatible argument type with the vector referenced type in between instruction");
+    }
+}

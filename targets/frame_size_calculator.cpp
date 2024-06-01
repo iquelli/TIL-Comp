@@ -239,3 +239,10 @@ void til::frame_size_calculator::do_address_of_node(
     til::address_of_node *const node, int lvl) {
     // EMPTY
 }
+
+//---------------------------------------------------------------------------
+
+void til::frame_size_calculator::do_between_node(til::between_node *const node, int lvl) {
+    ASSERT_SAFE_EXPRESSIONS;
+    _localsize += 2 * 4;
+}
