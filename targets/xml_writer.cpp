@@ -397,3 +397,23 @@ void til::xml_writer::do_sweep_node(til::sweep_node *const node, int lvl) {
     closeTag("condition", lvl + 2);
     closeTag(node, lvl);
 }
+
+//---------------------------------------------------------------------------
+
+void til::xml_writer::do_for_node(til::for_node *const node, int lvl) {
+    // ASSERT_SAFE_EXPRESSIONS;
+    openTag(node, lvl);
+    openTag("init", lvl + 2);
+    node->init()->accept(this, lvl + 4);
+    closeTag("init", lvl + 2);
+    openTag("condition", lvl + 2);
+    node->cond()->accept(this, lvl + 4);
+    closeTag("condition", lvl + 2);
+    openTag("inc", lvl + 2);
+    node->inc()->accept(this, lvl + 4);
+    closeTag("inc", lvl + 2);
+    openTag("block", lvl + 2);
+    node->block()->accept(this, lvl + 4);
+    closeTag("block", lvl + 2);
+    closeTag(node, lvl);
+}

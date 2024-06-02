@@ -246,3 +246,11 @@ void til::frame_size_calculator::do_sweep_node(til::sweep_node *const node, int 
     ASSERT_SAFE_EXPRESSIONS;
     _localsize += 2 * 4;
 }
+
+//---------------------------------------------------------------------------
+
+void til::frame_size_calculator::do_for_node(til::for_node *const node, int lvl) {
+    node->init()->accept(this, lvl);
+    node->inc()->accept(this, lvl);
+    node->block()->accept(this, lvl);
+}

@@ -930,3 +930,16 @@ void til::postfix_writer::do_sweep_node(til::sweep_node *const node, int lvl) {
     if_node->accept(this, lvl);
     _symtab.pop();
 }
+
+//---------------------------------------------------------------------------
+
+void til::postfix_writer::do_for_node(til::for_node *const node, int lvl) {
+    ASSERT_SAFE_EXPRESSIONS;
+
+    auto lineno = node->lineno();
+    node->init()->accept(this, lvl);
+    auto loop_body = new cdk::sequence_node(lineno, node->block());
+    loop_body = new cdk::sequence_node(lineno, node->inc(), loop_body);
+    auto loop_node = new til::loop_node(lineno, node->cond(), loop_body);
+    loop_node->accept(this, lvl);
+}

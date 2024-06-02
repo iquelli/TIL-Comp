@@ -715,3 +715,10 @@ void til::type_checker::do_sweep_node(til::sweep_node *const node, int lvl) {
         throw std::string("condition needs to be an integer");
     }
 }
+
+//---------------------------------------------------------------------------
+
+void til::type_checker::do_for_node(til::for_node *const node, int lvl) {
+    // EMPTY: the sub-nodes are already checked for their types in the
+    //        postfix_writer
+}

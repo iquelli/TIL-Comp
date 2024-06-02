@@ -1,0 +1,13 @@
+(program
+    (var v (objects 5))
+    (set (index v 0) 1)
+    (set (index v 1) 2)
+    (set (index v 2) 3)
+    (set (index v 3) 4)
+    (set (index v 4) 5)
+    (for (int i 0) (< i 4) (set i (+ i 1))
+        (println (index v i))
+    )
+
+    (return 0)
+)
